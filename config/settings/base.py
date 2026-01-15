@@ -29,7 +29,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'core',
     'empresas',
-    'accounts',
+    'accounts.apps.AccountsConfig',
+
 ]
 
 MIDDLEWARE = [
