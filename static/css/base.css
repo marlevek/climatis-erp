@@ -1,0 +1,24 @@
+body {
+    background-color: #f5f6f8;
+}
+
+h2 {
+    margin-bottom: 1rem;
+}
+
+.table {
+    background-color: #ffffff;
+}
+
+.form-control,
+.form-select {
+    margin-top: 0.25rem;
+}
+
+.form-check {
+    margin-top: 1rem;
+}
+
+.btn {
+    min-width: 100px;
+}

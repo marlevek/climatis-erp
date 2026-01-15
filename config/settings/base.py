@@ -1,5 +1,5 @@
 from pathlib import Path
-import os 
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'empresas',
     'accounts.apps.AccountsConfig',
     'clientes.apps.ClientesConfig',
+    'enderecos',
 
 ]
 
@@ -115,4 +116,7 @@ LOGOUT_REDIRECT_URL = '/admin/login/'
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]

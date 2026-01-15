@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Endereços{% endblock %}
+
+{% block content %}
+<h2 class="mb-3">Endereços do Cliente</h2>
+
+<div class="mb-3">
+    <a
+      href="{% url 'enderecos:novo' %}?cliente={{ cliente_id }}"
+      class="btn btn-primary"
+    >
+      Novo Endereço
+    </a>
+    <a href="{% url 'clientes:lista' %}" class="btn btn-secondary ms-2">
+      Voltar
+    </a>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>CEP</th>
+            <th>Endereço</th>
+            <th>Cidade</th>
+            <th>UF</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for e in enderecos %}
+        <tr>
+            <td>{{ e.cep }}</td>
+            <td>{{ e.logradouro }}, {{ e.numero }}</td>
+            <td>{{ e.cidade }}</td>
+            <td>{{ e.estado }}</td>
+            <td>
+                <!-- editar entra no próximo passo -->
+                <span class="text-muted">editar</span>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" class="text-center">
+                Nenhum endereço cadastrado.
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

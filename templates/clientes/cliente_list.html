@@ -36,7 +36,11 @@
             <td>
                 <a href="{% url 'clientes:editar' cliente.pk %}" class="btn btn-sm btn-outline-secondary">
                     Editar
-                </a>
+                    <a href="{% url 'enderecos:lista' %}?cliente={{ cliente.pk }}"
+                        class="btn btn-sm btn-outline-primary ms-1">
+                        Endereços
+                    </a>
+
             </td>
         </tr>
         {% empty %}
