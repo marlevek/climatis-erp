@@ -2,9 +2,13 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 from .models import Cliente
 from .forms import ClienteForm
+from django.contrib.auth.mixins import LoginRequiredMixin 
+from accounts.mixins import PerfilRequiredMixin
 
 
-class ClienteQuerysetMixin:
+class ClienteQuerysetMixin(LoginRequiredMixin, PerfilRequiredMixin):
+    login_url = '/admin/login/'
+    
     def get_queryset(self):
         return Cliente.objects.filter(
             empresa=self.request.user.perfil.empresa
@@ -17,7 +21,8 @@ class ClienteListView(ClienteQuerysetMixin, ListView):
     context_object_name = 'clientes'
 
 
-class ClienteCreateView(CreateView):
+class ClienteCreateView(LoginRequiredMixin, CreateView):
+    login_url = '/admin/login/'
     model = Cliente
     form_class = ClienteForm
     template_name = 'clientes/cliente_form.html'

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Cliente{% endblock %}
+
+{% block content %}
+<h2 class="mb-3">
+    {% if object %}Editar Cliente{% else %}Novo Cliente{% endif %}
+</h2>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            {{ form.tipo_pessoa.label_tag }}
+            {{ form.tipo_pessoa }}
+            {{ form.tipo_pessoa.errors }}
+        </div>
+
+        <div class="col-md-8 mb-3">
+            {{ form.nome.label_tag }}
+            {{ form.nome }}
+            {{ form.nome.errors }}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            {{ form.nome_fantasia.label_tag }}
+            {{ form.nome_fantasia }}
+            {{ form.nome_fantasia.errors }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+            {{ form.documento.label_tag }}
+            {{ form.documento }}
+            {{ form.documento.errors }}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            {{ form.email.label_tag }}
+            {{ form.email }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+            {{ form.telefone.label_tag }}
+            {{ form.telefone }}
+        </div>
+    </div>
+
+    <div class="form-check mb-3">
+        {{ form.ativo }}
+        {{ form.ativo.label_tag }}
+    </div>
+
+    <button type="submit" class="btn btn-success">
+        Salvar
+    </button>
+    <a href="{% url 'clientes:lista' %}" class="btn btn-secondary">
+        Voltar
+    </a>
+</form>
+{% endblock %}
