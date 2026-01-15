@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'core',
     'empresas',
     'accounts.apps.AccountsConfig',
+    'clientes.apps.ClientesConfig',
 
 ]
 
