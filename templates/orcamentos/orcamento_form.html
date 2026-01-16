@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Novo Orçamento</h2>
+
+<form method="post">
+  {% csrf_token %}
+
+  <div class="mb-3">
+    <label class="form-label">Cliente</label>
+    {{ form.cliente }}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Observações</label>
+    {{ form.observacoes }}
+  </div>
+
+  <button type="submit" class="btn btn-primary">Criar orçamento</button>
+</form>
+
+{% endblock %}

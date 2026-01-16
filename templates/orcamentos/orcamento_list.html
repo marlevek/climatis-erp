@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Orçamentos</h2>
+
+<a href="{% url 'clientes:orcamento_create' %}" class="btn btn-primary mb-3">
+    Novo orçamento
+</a>
+
+{% if object_list %}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Cliente</th>
+            <th>Data</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for orcamento in object_list %}
+        <tr>
+            <td>
+                <a href="{% url 'clientes:orcamento_detail' orcamento.id %}">
+                    #{{ orcamento.id }}
+                </a>
+            </td>
+
+            <td>{{ orcamento.cliente }}</td>
+            <td>{{ orcamento.data }}</td>
+            <td>{{ orcamento.get_status_display }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Nenhum orçamento criado.</p>
+{% endif %}
+
+{% endblock %}

@@ -1,16 +1,18 @@
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView
+from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from .models import Cliente
 from .forms import ClienteForm
-from clientes.models import Servico 
+from clientes.models import Servico, Orcamento, OrcamentoItem
 from django.contrib.auth.mixins import LoginRequiredMixin 
 from accounts.mixins import PerfilRequiredMixin
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.views import View
 from enderecos.services.cnpj_service import buscar_cnpj
+from django.shortcuts import redirect
 
 
+# CLIENTES
 class ClienteQuerysetMixin(LoginRequiredMixin, PerfilRequiredMixin):
     login_url = '/admin/login/'
     
@@ -92,7 +94,42 @@ class ServicoUpdateView(LoginRequiredMixin, UpdateView):
     fields = ServicoCreateView.fields
     template_name = 'servicos/servico_form.html'
     success_url = '/clientes/servicos/'
-    
+
+
+class OrcamentoDetailView(LoginRequiredMixin, DetailView):
+    model = Orcamento
+    template_name = 'orcamentos/orcamento_detail.html'
+
+    def get_queryset(self):
+        return Orcamento.objects.filter(
+            empresa=self.request.user.perfil.empresa
+        )
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+
+        servico_id = request.POST.get('servico')
+        quantidade = int(request.POST.get('quantidade', 1))
+        desconto_percentual = request.POST.get('desconto_percentual') or None
+        desconto_valor = request.POST.get('desconto_valor') or None
+        descricao = request.POST.get('descricao')
+
+        servico = Servico.objects.get(
+            id=servico_id,
+            empresa=request.user.perfil.empresa
+        )
+
+        OrcamentoItem.objects.create(
+            orcamento=self.object,
+            servico=servico,
+            descricao=descricao,
+            quantidade=quantidade,
+            valor_unitario=servico.valor_venda,
+            desconto_percentual=desconto_percentual,
+            desconto_valor=desconto_valor,
+        )
+
+        return redirect('clientes:orcamento_detail', pk=self.object.pk)
 
 
 @login_required
@@ -101,3 +138,24 @@ def gerar_codigo_servico(request):
     servico = Servico(empresa=empresa)
     codigo = servico.gerar_codigo_interno()
     return JsonResponse({'codigo': codigo})
+
+
+class OrcamentoListView(LoginRequiredMixin, ListView):
+    model = Orcamento
+    template_name = 'orcamentos/orcamento_list.html'
+
+    def get_queryset(self):
+        return Orcamento.objects.filter(
+            empresa=self.request.user.perfil.empresa
+        )
+
+
+class OrcamentoCreateView(LoginRequiredMixin, CreateView):
+    model = Orcamento
+    fields = ['cliente', 'observacoes']
+    template_name = 'orcamentos/orcamento_form.html'
+    success_url = reverse_lazy('clientes:orcamento_list')
+
+    def form_valid(self, form):
+        form.instance.empresa = self.request.user.perfil.empresa
+        return super().form_valid(form)

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Cliente, Fornecedor, Servico
+from .models import Cliente, Fornecedor, Servico, Orcamento, OrcamentoItem
 
 
 @admin.register(Cliente)
@@ -24,3 +24,13 @@ class ServicoAdmin(admin.ModelAdmin):
     )
     search_fields = ('nome', 'codigo_interno')
     list_filter = ('ativo', )
+
+
+class OrcamentoItemInline(admin.TabularInline):
+    model = OrcamentoItem
+    extra = 1
+
+@admin.register(Orcamento)
+class OrcamentoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'cliente', 'status', 'data')
+    inlines = [OrcamentoItemInline]

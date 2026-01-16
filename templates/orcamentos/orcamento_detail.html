@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Orçamento #{{ object.id }}</h2>
+
+<p><strong>Cliente:</strong> {{ object.cliente }}</p>
+
+<hr>
+
+<h4>Adicionar Serviço</h4>
+
+<form method="post">
+    {% csrf_token %}
+
+    <div class="row">
+        <div class="col-md-4">
+            <label>Serviço</label>
+            <select name="servico" id="servico-select" class="form-select" required>
+                <option value="">Selecione</option>
+                {% for servico in object.empresa.servicos.all %}
+                <option value="{{ servico.id }}" data-valor="{{ servico.valor_venda }}">
+                    {{ servico.nome }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label>Quantidade</label>
+            <input type="number" name="quantidade" class="form-control" value="1" min="1">
+        </div>
+
+        <div class="col-md-2">
+            <label>Valor unitário</label>
+            <input type="number" step="0.01" name="valor_unitario" id="valor-unitario" class="form-control" required>
+        </div>
+
+        <div class="col-md-3">
+            <label>Descrição</label>
+            <input type="text" name="descricao" class="form-control">
+        </div>
+
+        <div class="col-md-1">
+            <label>% Desc</label>
+            <input type="number" step="0.01" name="desconto_percentual" class="form-control">
+        </div>
+
+        <div class="col-md-2">
+            <label>R$ Desc</label>
+            <input type="number" step="0.01" name="desconto_valor" class="form-control">
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-success mt-3">
+        Adicionar
+    </button>
+</form>
+
+<hr>
+
+<h4>Itens do Orçamento</h4>
+
+{% if object.itens.all %}
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Serviço</th>
+            <th>Qtde</th>
+            <th>Valor</th>
+            <th>Desc</th>
+            <th>Subtotal</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in object.itens.all %}
+        <tr>
+            <td>{{ item.servico.nome }}</td>
+            <td>{{ item.quantidade }}</td>
+            <td>R$ {{ item.valor_unitario }}</td>
+            <td>
+                {% if item.desconto_percentual %}
+                {{ item.desconto_percentual }} %
+                {% elif item.desconto_valor %}
+                R$ {{ item.desconto_valor }}
+                {% else %}
+                —
+                {% endif %}
+            </td>
+            <td>R$ {{ item.subtotal|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<hr>
+
+<div class="row justify-content-end">
+    <div class="col-md-4">
+        <table class="table table-bordered">
+            <tr>
+                <th>Total do orçamento</th>
+                <td class="text-end">
+                    <strong>R$ {{ object.total|floatformat:2 }}</strong>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+
+{% else %}
+<p>Nenhum serviço adicionado.</p>
+{% endif %}
+
+{% load static %}
+<script src="{% static 'js/orcamento.js' %}"></script>
+{% endblock %}
