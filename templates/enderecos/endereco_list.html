@@ -5,14 +5,11 @@
 <h2 class="mb-3">Endereços do Cliente</h2>
 
 <div class="mb-3">
-    <a
-      href="{% url 'enderecos:novo' %}?cliente={{ cliente_id }}"
-      class="btn btn-primary"
-    >
-      Novo Endereço
+    <a href="{% url 'enderecos:novo' %}?cliente={{ cliente_id }}" class="btn btn-primary">
+        Novo Endereço
     </a>
     <a href="{% url 'clientes:lista' %}" class="btn btn-secondary ms-2">
-      Voltar
+        Voltar
     </a>
 </div>
 
@@ -34,8 +31,9 @@
             <td>{{ e.cidade }}</td>
             <td>{{ e.estado }}</td>
             <td>
-                <!-- editar entra no próximo passo -->
-                <span class="text-muted">editar</span>
+                <a href="{% url 'enderecos:editar' e.pk %}" class="btn btn-sm btn-outline-secondary">
+                    Editar
+                </a>
             </td>
         </tr>
         {% empty %}

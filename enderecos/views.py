@@ -1,11 +1,16 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, ListView
+from django.views.generic import CreateView, ListView, UpdateView
 
 from .models import Endereco
 from .forms import EnderecoForm
 from accounts.mixins import PerfilRequiredMixin
 from clientes.models import Cliente
+
+from django.http import JsonResponse 
+from django.views import View 
+from .services.cep_service import buscar_cep
+
 
 
 class EnderecoCreateView(LoginRequiredMixin, PerfilRequiredMixin, CreateView):
@@ -50,4 +55,29 @@ class EnderecoListView(LoginRequiredMixin, PerfilRequiredMixin, ListView):
         return context 
     
     
+class EnderecoUpdateView(LoginRequiredMixin, PerfilRequiredMixin, UpdateView):
+    model = Endereco 
+    form_class = EnderecoForm 
+    template_name = 'enderecos/endereco_form.html'
+    
+    
+    def get_success_url(self):
+        Cliente_id = self.object.cliente.id 
+        return reverse_lazy('enderecos:lista') + f'?cliente={Cliente_id}'
+    
+    def get_queryset(self):
+        # garante que só edite endereços da empresa do usuário
+        return Endereco.objects.filter(
+            cliente__empresa = self.request.user.perfil.empresa
+        )
 
+
+class BuscarCEPView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    def get(self, request):
+        cep = request.GET.get('cep', '')
+        dados = buscar_cep(cep)
+        
+        if not dados:
+            return JsonResponse({'erro': 'CEP inválido'}, status=400)
+        
+        return JsonResponse(dados)
