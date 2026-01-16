@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<h2>Serviço</h2>
+
+<form method="post">
+  {% csrf_token %}
+
+  <div class="mb-3">
+    <label class="form-label">Nome</label>
+    {{ form.nome }}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Código interno</label>
+    <div class="input-group">
+      {{ form.codigo_interno }}
+      <button type="button" id="btn-gerar-codigo" class="btn btn-outline-secondary">
+        Gerar
+      </button>
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Valor de custo</label>
+    {{ form.valor_custo }}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Valor de venda</label>
+    {{ form.valor_venda }}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Comissão (%)</label>
+    {{ form.comissao_percentual }}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Descrição</label>
+    {{ form.descricao }}
+  </div>
+
+  <div class="form-check mb-3">
+    {{ form.ativo }} <label class="form-check-label">Ativo</label>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Salvar</button>
+</form>
+
+<script src="{% static 'js/servico.js' %}"></script>
+{% endblock %}

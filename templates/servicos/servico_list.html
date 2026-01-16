@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Serviços</h2>
+
+<a href="{% url 'clientes:servico_create' %}" class="btn btn-primary mb-3">
+  Novo serviço
+</a>
+
+{% if object_list %}
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Nome</th>
+      <th>Código</th>
+      <th>Valor venda</th>
+      <th>Ativo</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for servico in object_list %}
+    <tr>
+      <td>{{ servico.nome }}</td>
+      <td>{{ servico.codigo_interno }}</td>
+      <td>{{ servico.valor_venda }}</td>
+      <td>{{ servico.ativo|yesno:"Sim,Não" }}</td>
+      <td>
+        <a href="{% url 'clientes:servico_update' servico.id %}">Editar</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Nenhum serviço cadastrado.</p>
+{% endif %}
+
+{% endblock %}

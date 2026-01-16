@@ -10,7 +10,7 @@ urlpatterns = [
 
     path('clientes/', include('clientes.urls')),
     path('enderecos/', include('enderecos.urls')),
-    
+
     
     path('', RedirectView.as_view(url='/clientes/', permanent=False)),
 
