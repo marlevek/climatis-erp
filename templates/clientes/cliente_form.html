@@ -31,10 +31,21 @@
         </div>
 
         <div class="col-md-6 mb-3">
-            {{ form.documento.label_tag }}
-            {{ form.documento }}
+            <label id="label-documento" for="id_documento">
+                Documento
+            </label>
+
+            <div class="input-group">
+                {{ form.documento }}
+                <button type="button" id="buscar-cnpj" class="btn btn-outline-secondary">
+                    🔍
+                </button>
+            </div>
+
             {{ form.documento.errors }}
         </div>
+
+
     </div>
 
     <div class="row">
@@ -61,4 +72,8 @@
         Voltar
     </a>
 </form>
+{% load static %}
+<script src="{% static 'js/cnpj.js' %}"></script>
+<script src="{% static 'js/pessoa_tipo.js' %}"></script>
+
 {% endblock %}

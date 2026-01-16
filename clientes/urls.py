@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     ClienteListView,
     ClienteCreateView,
-    ClienteUpdateView
+    ClienteUpdateView, 
+    BuscarCNPJView
 )
 
 app_name = 'clientes'
@@ -11,4 +12,5 @@ urlpatterns = [
     path('', ClienteListView.as_view(), name='lista'),
     path('novo/', ClienteCreateView.as_view(), name='novo'),
     path('<int:pk>/editar/', ClienteUpdateView.as_view(), name='editar'),
+    path('buscar-cnpj/', BuscarCNPJView.as_view(), name='buscar_cnpj'),
 ]
