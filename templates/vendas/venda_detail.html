@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>Venda #{{ venda.id }}</h2>
+
+<div class="mb-3">
+    <strong>Cliente:</strong> {{ venda.cliente }}<br>
+    <strong>Data:</strong> {{ venda.data|date:"d/m/Y" }}<br>
+    <strong>Status:</strong>
+    {% if venda.status == 'aberta' %}
+        <span class="badge bg-success">Aberta</span>
+    {% elif venda.status == 'faturada' %}
+        <span class="badge bg-primary">Faturada</span>
+    {% else %}
+        <span class="badge bg-secondary">Cancelada</span>
+    {% endif %}
+</div>
+
+<hr>
+
+<h5>Valores</h5>
+<p>
+    <strong>Valor total:</strong>
+    R$ {{ venda.valor_total|floatformat:2 }}
+</p>
+
+<hr>
+
+<h5>Pagamento (proposta copiada do orçamento)</h5>
+<p>
+    <strong>Tipo:</strong>
+    {{ venda.get_tipo_pagamento_display|default:"—" }}<br>
+
+    <strong>Condições:</strong>
+    {{ venda.condicoes_pagamento|default:"—" }}<br>
+
+    <strong>Observações:</strong>
+    {{ venda.observacoes_pagamento|default:"—" }}
+</p>
+
+<hr>
+
+<div class="d-flex gap-2">
+    <a href="{% url 'clientes:venda_list' %}" class="btn btn-outline-secondary">
+        Voltar
+    </a>
+
+    <!-- próximos passos -->
+    <button class="btn btn-outline-primary" disabled>
+        Definir pagamento
+    </button>
+
+    <button class="btn btn-outline-success" disabled>
+        Gerar NFS-e
+    </button>
+</div>
+
+{% endblock %}

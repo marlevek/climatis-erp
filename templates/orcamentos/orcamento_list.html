@@ -79,12 +79,15 @@
                         🖨
                     </a>
 
-                    <a href="{% url 'clientes:orcamento_delete' orcamento.id %}"
-                       class="btn btn-outline-danger"
-                       title="Excluir"
-                       onclick="return confirm('Excluir este orçamento?')">
-                        🗑
-                    </a>
+                    <form method="post"
+      action="{% url 'clientes:orcamento_delete' orcamento.id %}"
+      style="display:inline;"
+      onsubmit="return confirm('Tem certeza que deseja excluir este orçamento?');">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-outline-danger">
+        🗑
+    </button>
+</form>
                 </div>
             </td>
         </tr>

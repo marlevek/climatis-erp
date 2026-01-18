@@ -109,11 +109,10 @@ class OrcamentoDetailView(LoginRequiredMixin, DetailView):
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
-
         acao = request.POST.get('acao')
 
         # =========================
-        # DESCONTO GERAL DO ORÇAMENTO
+        # DESCONTO GERAL
         # =========================
         if acao == 'desconto_geral':
             desconto_tipo = request.POST.get('desconto_tipo') or None
@@ -128,100 +127,55 @@ class OrcamentoDetailView(LoginRequiredMixin, DetailView):
             self.object.desconto_valor = desconto_valor
             self.object.save()
 
-            return redirect(
-                'clientes:orcamento_detail',
-                pk=self.object.pk
-            )
-        
+            return redirect('clientes:orcamento_detail', pk=self.object.pk)
+
         # =========================
-        # SALVAR PROPOSTA DE PAGAMENTO (ORÇAMENTO)
+        # SALVAR ORÇAMENTO (GERAL)
         # =========================
-        if acao == 'salvar_pagamento':
+        elif acao == 'salvar_orcamento':
             self.object.tipo_pagamento = request.POST.get('tipo_pagamento') or None
             self.object.condicoes_pagamento = request.POST.get('condicoes_pagamento') or None
             self.object.observacoes_pagamento = request.POST.get('observacoes_pagamento') or None
 
-            self.object.save()
-
-            return redirect(
-                'clientes:orcamento_detail',
-                pk=self.object.pk
-            )
-       
-        
-        # =========================
-        # SALVAR ORÇAMENTO (FINALIZAR)
-        # =========================
-        if acao == 'salvar_orcamento':
-            # aqui você pode evoluir depois (ex: status = enviado)
             self.object.status = 'rascunho'
             self.object.save()
 
             return redirect('clientes:orcamento_list')
 
         # =========================
-        # APROVAR ORÇAMENTO → GERAR VENDA
+        # ADICIONAR ITEM
         # =========================
-        if acao == 'aprovar_orcamento':
-
-            # evita gerar venda duplicada
-            if hasattr(self.object, 'venda'):
+        elif acao == 'adicionar_item':
+            servico_id = request.POST.get('servico')
+            if not servico_id:
                 return redirect('clientes:orcamento_detail', pk=self.object.pk)
 
-            # cria a venda
-            Venda.objects.create(
-                empresa=self.object.empresa,
-                cliente=self.object.cliente,
+            quantidade = int(request.POST.get('quantidade', 1))
+            desconto_percentual = request.POST.get('desconto_percentual') or None
+            desconto_valor = request.POST.get('desconto_valor') or None
+            descricao = request.POST.get('descricao')
+
+            servico = Servico.objects.get(
+                id=servico_id,
+                empresa=request.user.perfil.empresa
+            )
+
+            OrcamentoItem.objects.create(
                 orcamento=self.object,
-                valor_total=self.object.total_com_desconto(),
-            
-            # Cópia da proposta de pagamento
-            tipo_pagamento = self.object.tipo_pagamento,
-            condicoes_pagamento = self.object.condicoes_pagamento,
-            observacoes_pagamento = self.object.observacoes_pagamento,
-            
-            )
-            
-            # atualiza status do orçamento
-            self.object.status = 'aprovado'
-            self.object.save()
-
-            return redirect('clientes:venda_list')
-
-        # =========================
-        # ADICIONAR ITEM AO ORÇAMENTO
-        # =========================
-        servico_id = request.POST.get('servico')
-        if not servico_id:
-            return redirect(
-                'clientes:orcamento_detail',
-                pk=self.object.pk
+                servico=servico,
+                descricao=descricao,
+                quantidade=quantidade,
+                valor_unitario=servico.valor_venda,
+                desconto_percentual=desconto_percentual,
+                desconto_valor=desconto_valor,
             )
 
-        quantidade = int(request.POST.get('quantidade', 1))
-        desconto_percentual = request.POST.get('desconto_percentual') or None
-        desconto_valor = request.POST.get('desconto_valor') or None
-        descricao = request.POST.get('descricao')
+            return redirect('clientes:orcamento_detail', pk=self.object.pk)
 
-        servico = Servico.objects.get(
-            id=servico_id,
-            empresa=request.user.perfil.empresa
-        )
-
-        OrcamentoItem.objects.create(
-            orcamento=self.object,
-            servico=servico,
-            descricao=descricao,
-            quantidade=quantidade,
-            valor_unitario=servico.valor_venda,
-            desconto_percentual=desconto_percentual,
-            desconto_valor=desconto_valor,
-        )
-
-        return redirect(
-            'clientes:orcamento_detail',
-            pk=self.object.pk
-        )
+        # =========================
+        # FALLBACK DE SEGURANÇA
+        # =========================
+        return redirect('clientes:orcamento_detail', pk=self.object.pk)
 
 
 @login_required
@@ -286,16 +240,20 @@ class OrcamentoCreateView(LoginRequiredMixin, CreateView):
     model = Orcamento
     fields = ['cliente', 'observacoes']
     template_name = 'orcamentos/orcamento_form.html'
-    success_url = reverse_lazy('clientes:orcamento_list')
 
     def form_valid(self, form):
-        form.instance.empresa = self.request.user.perfil.empresa
-        return super().form_valid(form)
+        orcamento = form.save(commit=False)
+        orcamento.empresa = self.request.user.perfil.empresa
+        orcamento.save()
+        
+        return redirect(
+            'clientes:orcamento_detail',
+            pk=orcamento.pk
+        )
 
 
 class OrcamentoDeleteView(LoginRequiredMixin, DeleteView):
     model = Orcamento
-    template_name = 'orcamentos/orcamento_delete.html'
     success_url = reverse_lazy('clientes:orcamento_list')
 
     def get_queryset(self):
@@ -362,7 +320,7 @@ class VendaListView(LoginRequiredMixin, ListView):
         ).select_related('cliente', 'orcamento')
 
 
-class VendaDetailVew(LoginRequiredMixin, DetailView):
+class VendaDetailView(LoginRequiredMixin, DetailView):
     model = Venda
     template_name = 'vendas/venda_detail.html'
     context_object_name = 'venda'

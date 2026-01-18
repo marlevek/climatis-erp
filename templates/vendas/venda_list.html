@@ -19,9 +19,11 @@
     <tbody>
         {% for venda in vendas %}
         <tr>
-            <td>#{{ venda.id }}</td>
+            <td>#{{ venda.id }}
+    </td>
 
-            <td>{{ venda.cliente }}</td>
+            <td><a href="{% url 'clientes:venda_detail' venda.id %}">
+                #{{ venda.cliente }}</a></td>
 
             <td>{{ venda.data|date:"d/m/Y" }}</td>
 
