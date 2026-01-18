@@ -1,8 +1,9 @@
 from django.urls import reverse_lazy
+import json
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
 from .models import Cliente
 from .forms import ClienteForm
-from clientes.models import Servico, Orcamento, OrcamentoItem, Venda
+from clientes.models import Servico, Orcamento, OrcamentoItem, Venda, Parcelamento
 from django.contrib.auth.mixins import LoginRequiredMixin 
 from accounts.mixins import PerfilRequiredMixin
 from django.http import JsonResponse
@@ -11,6 +12,8 @@ from django.views import View
 from enderecos.services.cnpj_service import buscar_cnpj
 from django.shortcuts import redirect, get_object_or_404
 from decimal import Decimal
+from datetime import timedelta, datetime
+from django.utils import timezone
 
 
 # CLIENTES
@@ -320,12 +323,147 @@ class VendaListView(LoginRequiredMixin, ListView):
         ).select_related('cliente', 'orcamento')
 
 
+
+from decimal import Decimal
+from datetime import datetime, timedelta
+from django.utils import timezone
+from django.shortcuts import redirect
+from django.views.generic import DetailView
+from django.contrib.auth.mixins import LoginRequiredMixin
+
+from clientes.models import Venda, Parcelamento
+
+
 class VendaDetailView(LoginRequiredMixin, DetailView):
     model = Venda
     template_name = 'vendas/venda_detail.html'
     context_object_name = 'venda'
-    
+
     def get_queryset(self):
         return Venda.objects.filter(
-            empresa = self.request.user.perfil.empresa
+            empresa=self.request.user.perfil.empresa
         ).select_related('cliente', 'orcamento')
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        acao = request.POST.get('acao')
+
+        # =====================================================
+        # 1️⃣ SALVAR PAGAMENTO REAL (SEM GERAR PARCELAS)
+        # =====================================================
+        if acao == 'salvar_pagamento_real':
+
+            tipo = request.POST.get('tipo_pagamento_real') or None
+            forma = request.POST.get('forma_pagamento') or None
+            data_pagamento = request.POST.get('data_pagamento')
+            observacoes = request.POST.get('observacoes_pagamento')
+
+            valor_input = request.POST.get('valor_pagamento')
+            if valor_input:
+                try:
+                    valor = Decimal(valor_input)
+                except:
+                    valor = self.object.valor_total
+            else:
+                valor = self.object.valor_total
+
+            if not data_pagamento:
+                data_pagamento = timezone.now().date()
+
+            # salva SOMENTE na venda
+            self.object.tipo_pagamento_real = tipo
+            self.object.forma_pagamento = forma
+            self.object.data_pagamento = data_pagamento
+            self.object.valor_pagamento = valor
+            self.object.observacoes_pagamento_real = observacoes
+            self.object.save()
+
+            parcelas_json = request.POST.get('parcelas_json')
+            
+            # Se for parcelado e tiver parcelas geradas no frontend:
+        if parcelas_json:
+            parcelas = json.loads(parcelas_json)
+
+            # limpa parcelas antigas
+            self.object.parcelas.all().delete()
+
+            for p in parcelas:
+                Parcelamento.objects.create(
+                    venda=self.object,
+                    numero=int(p.get('numero') or 0),
+                    valor=Decimal(str(p.get('valor') or '0.00')),
+                    data_vencimento=p.get('data'),
+                    forma_pagamento=p.get('forma_pagamento') or self.object.forma_pagamento,
+                    observacao=p.get('observacao') or '',
+                    status='pendente',
+                )
+        else:
+            # Se for à vista, você pode manter 1 parcela automaticamente (opcional)
+            if self.object.tipo_pagamento_real == 'avista':
+                self.object.parcelas.all().delete()
+                Parcelamento.objects.create(
+                    venda=self.object,
+                    numero=1,
+                    valor=self.object.valor_pagamento or self.object.valor_total,
+                    data_vencimento=self.object.data_pagamento,
+                    forma_pagamento=self.object.forma_pagamento,
+                    observacao='',
+                    status='pendente',
+                )
+        
+
+            return redirect(
+                'clientes:venda_list'
+            )
+
+        # =====================================================
+        # 2️⃣ GERAR PARCELAS (BASEADO NO VALOR INFORMADO)
+        # =====================================================
+        if acao == 'gerar_parcelas':
+
+            # limpa parcelas anteriores
+            self.object.parcelas.all().delete()
+
+            qtd = int(request.POST.get('qtd_parcelas', 1))
+            intervalo = int(request.POST.get('intervalo_dias', 30))
+
+            data_primeira = request.POST.get('data_primeira_parcela')
+            if data_primeira:
+                data_base = datetime.strptime(
+                    data_primeira, '%Y-%m-%d'
+                ).date()
+            else:
+                data_base = self.object.data_pagamento or timezone.now().date()
+
+            # valor base vem do pagamento real (entrada já considerada)
+            valor_base = self.object.valor_pagamento or self.object.valor_total
+
+            if qtd <= 0:
+                return redirect(
+                    'clientes:venda_detail',
+                    pk=self.object.pk
+                )
+
+            valor_parcela = (valor_base / qtd).quantize(Decimal('0.01'))
+
+            for i in range(qtd):
+                Parcelamento.objects.create(
+                    venda=self.object,
+                    numero=i + 1,
+                    valor=valor_parcela,
+                    data_vencimento=data_base + timedelta(days=i * intervalo),
+                    forma_pagamento=self.object.forma_pagamento,
+                    status='pendente',
+                )
+
+            return redirect(
+                'clientes:venda_detail',
+                pk=self.object.pk
+            )
+
+        # fallback seguro
+        return redirect(
+            'clientes:venda_detail',
+            pk=self.object.pk
+        )
+

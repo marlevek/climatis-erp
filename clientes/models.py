@@ -344,7 +344,12 @@ class Venda(models.Model):
         ('faturada', 'Faturada'),
         ('cancelada', 'Cancelada'),
     )
-    
+
+    TIPO_PAGAMENTO_CHOICES = (
+        ('avista', 'À vista'),
+        ('parcelado', 'Parcelado'),
+    )
+
     empresa = models.ForeignKey(
         'empresas.Empresa',
         on_delete=models.CASCADE,
@@ -356,26 +361,30 @@ class Venda(models.Model):
         on_delete=models.PROTECT,
         related_name='vendas'
     )
-    
+
     orcamento = models.OneToOneField(
         'clientes.Orcamento',
         on_delete=models.CASCADE,
         related_name='venda'
     )
-    
+
     data = models.DateField(auto_now_add=True)
-    
+
     valor_total = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         default=Decimal('0.00')
     )
-    
-    TIPO_PAGAMENTO_CHOICES = (
-    ('avista', 'À vista'),
-    ('parcelado', 'Parcelado'),
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='aberta'
     )
 
+    # =========================
+    # PROPOSTA (do orçamento)
+    # =========================
     tipo_pagamento = models.CharField(
         max_length=20,
         choices=TIPO_PAGAMENTO_CHOICES,
@@ -393,12 +402,48 @@ class Venda(models.Model):
         blank=True,
         null=True
     )
-    
-    status = models.CharField(
+
+    # =========================
+    # PAGAMENTO REAL (financeiro)
+    # =========================
+    tipo_pagamento_real = models.CharField(
         max_length=20,
-        choices=STATUS_CHOICES,
-        default='aberta'
+        choices=TIPO_PAGAMENTO_CHOICES,
+        blank=True,
+        null=True
     )
+
+    forma_pagamento = models.CharField(
+        max_length=30,
+        blank=True,
+        null=True
+    )
+
+    data_pagamento = models.DateField(
+        blank=True,
+        null=True
+    )
+
+    valor_pagamento = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True
+    )
+
+    observacoes_pagamento_real = models.TextField(
+        blank=True,
+        null=True
+    )
+
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-data']
+
+    def __str__(self):
+        return f'Venda #{self.id} - {self.cliente}'
+
     
     criado_em = models.DateTimeField(auto_now_add=True)
     
@@ -407,3 +452,52 @@ class Venda(models.Model):
         
     def __str__(self):
         return f'Venda #{self.id} - {self.cliente}'
+    
+
+# Parcelamento venda
+class Parcelamento(models.Model):
+    STATUS_CHOICES = (
+        ('pendente', 'Pendente'),
+        ('paga', 'Paga'),
+        ('cancelada', 'Cancelada'),
+    )
+    
+    venda = models.ForeignKey(
+        'clientes.Venda',
+        on_delete=models.CASCADE,
+        related_name='parcelas'
+    )
+    
+    numero = models.PositiveIntegerField(
+        help_text='Número da parcela (1, 2, 3...)'
+    )
+    
+    valor = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+    
+    data_vencimento = models.DateField()
+    
+    forma_pagamento = models.CharField(
+        max_length=30,
+        blank=True,
+        null=True
+    )
+    
+    status =models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pendente'
+    )
+    
+    observacao = models.CharField(max_length=255, blank=True, null=True)
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['data_vencimento']
+        
+    def __str__(self):
+        return f'Parcela {self.numero} - Venda #{self.venda.id}'
+
