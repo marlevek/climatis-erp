@@ -148,6 +148,7 @@ class Servico(models.Model):
             self.codigo_interno = self.gerar_codigo_interno()
         super().save(*args, **kwargs)
         
+        
 # Orçamentos
 class Orcamento(models.Model):
     STATUS_CHOICES = (
@@ -178,6 +179,33 @@ class Orcamento(models.Model):
     )
     
     observacoes = models.TextField(blank=True, null=True)
+    
+    TIPO_PAGAMENTOS_CHOICES = (
+        ('avista', 'À vista'),
+        ('parcelado', 'Parcelado'),
+    )
+    
+    tipo_pagamento = models.CharField(
+        max_length=20, 
+        choices=TIPO_PAGAMENTOS_CHOICES,
+        blank=True,
+        null=True,
+        help_text='Forma de pagamento proposta ao cliente'
+    )
+    
+    condicoes_pagamento = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text='Ex.: 3x sem juros, Entrada + 2 parcelas'
+    )
+    
+    observacoes_pagamento = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Ex.: 50% entrada na confirmação do serviço'
+    )
+    
     
     TIPO_DESCONTO_GERAL_CHOICES = (
         ('percentual', 'Percentual (%)'),
@@ -341,6 +369,29 @@ class Venda(models.Model):
         max_digits=10,
         decimal_places=2,
         default=Decimal('0.00')
+    )
+    
+    TIPO_PAGAMENTO_CHOICES = (
+    ('avista', 'À vista'),
+    ('parcelado', 'Parcelado'),
+    )
+
+    tipo_pagamento = models.CharField(
+        max_length=20,
+        choices=TIPO_PAGAMENTO_CHOICES,
+        blank=True,
+        null=True
+    )
+
+    condicoes_pagamento = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True
+    )
+
+    observacoes_pagamento = models.TextField(
+        blank=True,
+        null=True
     )
     
     status = models.CharField(

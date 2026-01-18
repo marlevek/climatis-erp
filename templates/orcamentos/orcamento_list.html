@@ -32,11 +32,33 @@
 
             <td>{{ orcamento.data|date:"d/m/Y" }}</td>
 
-            <td>
-                <span class="badge bg-secondary">
-                    {{ orcamento.get_status_display }}
-                </span>
-            </td>
+<td>
+    <form method="post" action="{% url 'clientes:orcamento_list' %}">
+        {% csrf_token %}
+        <input type="hidden" name="orcamento_id" value="{{ orcamento.id }}">
+
+        <select name="status"
+                class="form-select form-select-sm"
+                onchange="this.form.submit()">
+
+            <option value="rascunho"
+                {% if orcamento.status == 'rascunho' %}selected{% endif %}>
+                Rascunho
+            </option>
+
+            <option value="aprovado"
+                {% if orcamento.status == 'aprovado' %}selected{% endif %}>
+                Aprovado
+            </option>
+
+            <option value="rejeitado"
+                {% if orcamento.status == 'rejeitado' %}selected{% endif %}>
+                Rejeitado
+            </option>
+        </select>
+    </form>
+</td>
+
 
             <td class="text-end">
                 R$ {{ orcamento.total_com_desconto|floatformat:2 }}

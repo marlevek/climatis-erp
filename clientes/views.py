@@ -9,7 +9,7 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.views import View
 from enderecos.services.cnpj_service import buscar_cnpj
-from django.shortcuts import redirect
+from django.shortcuts import redirect, get_object_or_404
 from decimal import Decimal
 
 
@@ -132,7 +132,23 @@ class OrcamentoDetailView(LoginRequiredMixin, DetailView):
                 'clientes:orcamento_detail',
                 pk=self.object.pk
             )
+        
+        # =========================
+        # SALVAR PROPOSTA DE PAGAMENTO (ORÇAMENTO)
+        # =========================
+        if acao == 'salvar_pagamento':
+            self.object.tipo_pagamento = request.POST.get('tipo_pagamento') or None
+            self.object.condicoes_pagamento = request.POST.get('condicoes_pagamento') or None
+            self.object.observacoes_pagamento = request.POST.get('observacoes_pagamento') or None
 
+            self.object.save()
+
+            return redirect(
+                'clientes:orcamento_detail',
+                pk=self.object.pk
+            )
+       
+        
         # =========================
         # SALVAR ORÇAMENTO (FINALIZAR)
         # =========================
@@ -143,7 +159,7 @@ class OrcamentoDetailView(LoginRequiredMixin, DetailView):
 
             return redirect('clientes:orcamento_list')
 
-                # =========================
+        # =========================
         # APROVAR ORÇAMENTO → GERAR VENDA
         # =========================
         if acao == 'aprovar_orcamento':
@@ -157,14 +173,20 @@ class OrcamentoDetailView(LoginRequiredMixin, DetailView):
                 empresa=self.object.empresa,
                 cliente=self.object.cliente,
                 orcamento=self.object,
-                valor_total=self.object.total_com_desconto()
+                valor_total=self.object.total_com_desconto(),
+            
+            # Cópia da proposta de pagamento
+            tipo_pagamento = self.object.tipo_pagamento,
+            condicoes_pagamento = self.object.condicoes_pagamento,
+            observacoes_pagamento = self.object.observacoes_pagamento,
+            
             )
-
+            
             # atualiza status do orçamento
             self.object.status = 'aprovado'
             self.object.save()
 
-            return redirect('clientes:orcamento_list')
+            return redirect('clientes:venda_list')
 
         # =========================
         # ADICIONAR ITEM AO ORÇAMENTO
@@ -213,11 +235,51 @@ def gerar_codigo_servico(request):
 class OrcamentoListView(LoginRequiredMixin, ListView):
     model = Orcamento
     template_name = 'orcamentos/orcamento_list.html'
+    context_object_name = 'object_list'
 
     def get_queryset(self):
         return Orcamento.objects.filter(
             empresa=self.request.user.perfil.empresa
         )
+
+    def post(self, request, *args, **kwargs):
+        orcamento_id = request.POST.get('orcamento_id')
+        novo_status = request.POST.get('status')
+
+        if not orcamento_id or not novo_status:
+            return redirect('clientes:orcamento_list')
+
+        orcamento = get_object_or_404(
+            Orcamento,
+            pk=orcamento_id,
+            empresa=request.user.perfil.empresa
+        )
+
+        # =========================
+        # MUDANÇA DE STATUS
+        # =========================
+        if novo_status != orcamento.status:
+            orcamento.status = novo_status
+            orcamento.save()
+
+            # =========================
+            # SE APROVADO → GERAR VENDA
+            # =========================
+            if novo_status == 'aprovado':
+                if not hasattr(orcamento, 'venda'):
+                    Venda.objects.create(
+                        empresa=orcamento.empresa,
+                        cliente=orcamento.cliente,
+                        orcamento=orcamento,
+                        valor_total=orcamento.total_com_desconto(),
+
+                        # copia proposta de pagamento
+                        tipo_pagamento=orcamento.tipo_pagamento,
+                        condicoes_pagamento=orcamento.condicoes_pagamento,
+                        observacoes_pagamento=orcamento.observacoes_pagamento,
+                    )
+
+        return redirect('clientes:orcamento_list')
 
 
 class OrcamentoCreateView(LoginRequiredMixin, CreateView):
@@ -299,3 +361,13 @@ class VendaListView(LoginRequiredMixin, ListView):
             empresa = self.request.user.perfil.empresa
         ).select_related('cliente', 'orcamento')
 
+
+class VendaDetailVew(LoginRequiredMixin, DetailView):
+    model = Venda
+    template_name = 'vendas/venda_detail.html'
+    context_object_name = 'venda'
+    
+    def get_queryset(self):
+        return Venda.objects.filter(
+            empresa = self.request.user.perfil.empresa
+        ).select_related('cliente', 'orcamento')

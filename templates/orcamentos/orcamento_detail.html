@@ -14,11 +14,6 @@
         <a href="{% url 'clientes:orcamento_print' object.id %}" target="_blank" class="btn btn-outline-primary">
             🖨 Imprimir
         </a>
-
-        <a href="{% url 'clientes:orcamento_delete' object.id %}" class="btn btn-danger"
-            onclick="return confirm('Tem certeza que deseja excluir TODO o orçamento?')">
-            🗑 Excluir orçamento
-        </a>
     </div>
 </div>
 
@@ -184,26 +179,61 @@
 
 <hr>
 
-<form method="post" class="d-inline">
+<h5>Proposta de pagamento</h5>
+
+<form method="post">
     {% csrf_token %}
-    <input type="hidden" name="acao" value="aprovar_orcamento">
-    <button type="submit"
-            class="btn btn-success"
-            onclick="return confirm('Confirmar aprovação do orçamento? Isso irá gerar uma venda.')">
-        ✅ Aprovar orçamento
-    </button>
+    <input type="hidden" name="acao" value="salvar_pagamento">
+
+    <div class="row">
+        <div class="col-md-3">
+            <label class="form-label">Tipo de pagamento</label>
+            <select name="tipo_pagamento" class="form-select">
+                <option value="">Selecione</option>
+                <option value="avista"
+                    {% if object.tipo_pagamento == 'avista' %}selected{% endif %}>
+                    À vista
+                </option>
+                <option value="parcelado"
+                    {% if object.tipo_pagamento == 'parcelado' %}selected{% endif %}>
+                    Parcelado
+                </option>
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Condições</label>
+            <input type="text"
+                   name="condicoes_pagamento"
+                   class="form-control"
+                   placeholder="Ex: 3x sem juros"
+                   value="{{ object.condicoes_pagamento|default_if_none:'' }}">
+        </div>
+
+        <div class="col-md-5">
+            <label class="form-label">Observações</label>
+            <input type="text"
+                   name="observacoes_pagamento"
+                   class="form-control"
+                   placeholder="Ex.: 50% entrada na confirmação do serviço"
+                   value="{{ object.observacoes_pagamento|default_if_none:'' }}">
+        </div>
+    </div>
+
 </form>
 
-<div class="d-flex justify-content-end gap-2">
-    <form method="post">
+<hr>
+
+{% if object.status == 'rascunho' %}
+    <!-- BOTÃO SALVAR ORÇAMENTO -->
+    <form method="post" class="d-inline">
         {% csrf_token %}
         <input type="hidden" name="acao" value="salvar_orcamento">
-        <button type="submit" class="btn btn-success mb-5">
-            ✅ Salvar orçamento
+        <button type="submit" class="btn btn-success">
+            💾 Salvar orçamento
         </button>
     </form>
-</div>
-
+{% endif %}
 
 {% else %}
 <p>Nenhum serviço adicionado.</p>
