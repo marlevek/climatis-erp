@@ -1,11 +1,7 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
-<h2>Orçamento #{{ object.id }}</h2>
-
-<p><strong>Cliente:</strong> {{ object.cliente }}</p>
-
-<hr>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Orçamento #{{ object.id }}</h2>
@@ -26,12 +22,14 @@
     </div>
 </div>
 
+<p><strong>Cliente:</strong> {{ object.cliente }}</p>
 
-<h4>Adicionar Serviço</h4>
+<hr>
+
+<h4>Adicionar serviço</h4>
 
 <form method="post">
     {% csrf_token %}
-
     <div class="row">
         <div class="col-md-4">
             <label>Serviço</label>
@@ -46,48 +44,43 @@
         </div>
 
         <div class="col-md-2">
-            <label>Quantidade</label>
+            <label>Qtde</label>
             <input type="number" name="quantidade" class="form-control" value="1" min="1">
         </div>
 
         <div class="col-md-2">
-            <label>Valor unitário</label>
-            <input type="number" step="0.01" name="valor_unitario" id="valor-unitario" class="form-control" required>
+            <label>Valor unit.</label>
+            <input type="number" step="0.01" name="valor_unitario" id="valor-unitario" class="form-control">
         </div>
 
-        <div class="col-md-3">
-            <label>Descrição</label>
-            <input type="text" name="descricao" class="form-control">
-        </div>
-
-        <div class="col-md-1">
-            <label>% Desc</label>
+        <div class="col-md-2">
+            <label>% Desc (item)</label>
             <input type="number" step="0.01" name="desconto_percentual" class="form-control">
         </div>
 
         <div class="col-md-2">
-            <label>R$ Desc</label>
+            <label>R$ Desc (item)</label>
             <input type="number" step="0.01" name="desconto_valor" class="form-control">
         </div>
     </div>
 
     <button type="submit" class="btn btn-success mt-3">
-        Adicionar
+        Adicionar serviço
     </button>
 </form>
 
 <hr>
 
-<h4>Itens do Orçamento</h4>
+<h4>Itens do orçamento</h4>
 
 {% if object.itens.all %}
-<table class="table table-bordered">
+<table class="table table-bordered align-middle">
     <thead>
         <tr>
             <th>Serviço</th>
             <th>Qtde</th>
             <th>Valor</th>
-            <th>Desc</th>
+            <th>Desconto</th>
             <th>Subtotal</th>
             <th class="text-center">Ações</th>
         </tr>
@@ -97,33 +90,68 @@
         <tr>
             <td>{{ item.servico.nome }}</td>
             <td>{{ item.quantidade }}</td>
-            <td>R$ {{ item.valor_unitario }}</td>
+            <td>R$ {{ item.valor_unitario|floatformat:2 }}</td>
             <td>
                 {% if item.desconto_percentual %}
                 {{ item.desconto_percentual }} %
                 {% elif item.desconto_valor %}
-                R$ {{ item.desconto_valor }}
+                R$ {{ item.desconto_valor|floatformat:2 }}
                 {% else %}
                 —
                 {% endif %}
             </td>
             <td>R$ {{ item.subtotal|floatformat:2 }}</td>
+            <td class="text-center">
+                <a href="{% url 'clientes:orcamento_item_edit' item.id %}" class="btn btn-sm btn-outline-warning"
+                    title="Editar item">
+                    ✏️
+                </a>
+                <a href="{% url 'clientes:orcamento_item_delete' item.id %}" class="btn btn-sm btn-outline-danger"
+                    title="Remover item">
+                    🗑
+                </a>
+            </td>
         </tr>
-        <td class="text-center">
-            <a href="{% url 'clientes:orcamento_item_edit' item.id %}" class="btn btn-sm btn-outline-warning"
-                title="Editar item">
-                ✏️
-            </a>
-
-            <a href="{% url 'clientes:orcamento_item_delete' item.id %}" class="btn btn-sm btn-outline-danger"
-                title="Remover item">
-                🗑
-            </a>
-        </td>
-
         {% endfor %}
     </tbody>
 </table>
+
+<hr>
+
+<h5>Desconto geral do orçamento</h5>
+
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="desconto_geral">
+
+    <div class="row align-items-end">
+        <div class="col-md-4">
+            <label>Tipo</label>
+            <select name="desconto_tipo" class="form-select">
+                <option value="">Sem desconto</option>
+                <option value="percentual" {% if object.desconto_tipo == 'percentual' %}selected{% endif %}>
+                    Percentual (%)
+                </option>
+                <option value="valor" {% if object.desconto_tipo == 'valor' %}selected{% endif %}>
+                    Valor (R$)
+                </option>
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label>Valor</label>
+            <input type="number" step="0.01" name="desconto_valor" class="form-control"
+                value="{{ object.desconto_valor }}">
+        </div>
+
+        <div class="col-md-3">
+            <button class="btn btn-outline-primary">
+                Aplicar desconto geral
+            </button>
+        </div>
+        
+    </div>
+</form>
 
 <hr>
 
@@ -131,13 +159,49 @@
     <div class="col-md-4">
         <table class="table table-bordered">
             <tr>
-                <th>Total do orçamento</th>
+                <th>Total dos itens</th>
+                <td class="text-end">R$ {{ object.total_itens|floatformat:2 }}</td>
+            </tr>
+
+            {% if object.valor_desconto_geral > 0 %}
+            <tr>
+                <th>Desconto geral</th>
+                <td class="text-end text-danger">
+                    - R$ {{ object.valor_desconto_geral|floatformat:2 }}
+                </td>
+            </tr>
+            {% endif %}
+
+            <tr>
+                <th>Total final</th>
                 <td class="text-end">
-                    <strong>R$ {{ object.total|floatformat:2 }}</strong>
+                    <strong>R$ {{ object.total_com_desconto|floatformat:2 }}</strong>
                 </td>
             </tr>
         </table>
     </div>
+</div>
+
+<hr>
+
+<form method="post" class="d-inline">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="aprovar_orcamento">
+    <button type="submit"
+            class="btn btn-success"
+            onclick="return confirm('Confirmar aprovação do orçamento? Isso irá gerar uma venda.')">
+        ✅ Aprovar orçamento
+    </button>
+</form>
+
+<div class="d-flex justify-content-end gap-2">
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="salvar_orcamento">
+        <button type="submit" class="btn btn-success mb-5">
+            ✅ Salvar orçamento
+        </button>
+    </form>
 </div>
 
 
@@ -145,6 +209,6 @@
 <p>Nenhum serviço adicionado.</p>
 {% endif %}
 
-{% load static %}
 <script src="{% static 'js/orcamento.js' %}"></script>
+
 {% endblock %}

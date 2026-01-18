@@ -2,7 +2,7 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
 from .models import Cliente
 from .forms import ClienteForm
-from clientes.models import Servico, Orcamento, OrcamentoItem
+from clientes.models import Servico, Orcamento, OrcamentoItem, Venda
 from django.contrib.auth.mixins import LoginRequiredMixin 
 from accounts.mixins import PerfilRequiredMixin
 from django.http import JsonResponse
@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.views import View
 from enderecos.services.cnpj_service import buscar_cnpj
 from django.shortcuts import redirect
+from decimal import Decimal
 
 
 # CLIENTES
@@ -109,7 +110,72 @@ class OrcamentoDetailView(LoginRequiredMixin, DetailView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
 
+        acao = request.POST.get('acao')
+
+        # =========================
+        # DESCONTO GERAL DO ORÇAMENTO
+        # =========================
+        if acao == 'desconto_geral':
+            desconto_tipo = request.POST.get('desconto_tipo') or None
+            desconto_valor = request.POST.get('desconto_valor') or '0'
+
+            try:
+                desconto_valor = Decimal(desconto_valor)
+            except:
+                desconto_valor = Decimal('0.00')
+
+            self.object.desconto_tipo = desconto_tipo
+            self.object.desconto_valor = desconto_valor
+            self.object.save()
+
+            return redirect(
+                'clientes:orcamento_detail',
+                pk=self.object.pk
+            )
+
+        # =========================
+        # SALVAR ORÇAMENTO (FINALIZAR)
+        # =========================
+        if acao == 'salvar_orcamento':
+            # aqui você pode evoluir depois (ex: status = enviado)
+            self.object.status = 'rascunho'
+            self.object.save()
+
+            return redirect('clientes:orcamento_list')
+
+                # =========================
+        # APROVAR ORÇAMENTO → GERAR VENDA
+        # =========================
+        if acao == 'aprovar_orcamento':
+
+            # evita gerar venda duplicada
+            if hasattr(self.object, 'venda'):
+                return redirect('clientes:orcamento_detail', pk=self.object.pk)
+
+            # cria a venda
+            Venda.objects.create(
+                empresa=self.object.empresa,
+                cliente=self.object.cliente,
+                orcamento=self.object,
+                valor_total=self.object.total_com_desconto()
+            )
+
+            # atualiza status do orçamento
+            self.object.status = 'aprovado'
+            self.object.save()
+
+            return redirect('clientes:orcamento_list')
+
+        # =========================
+        # ADICIONAR ITEM AO ORÇAMENTO
+        # =========================
         servico_id = request.POST.get('servico')
+        if not servico_id:
+            return redirect(
+                'clientes:orcamento_detail',
+                pk=self.object.pk
+            )
+
         quantidade = int(request.POST.get('quantidade', 1))
         desconto_percentual = request.POST.get('desconto_percentual') or None
         desconto_valor = request.POST.get('desconto_valor') or None
@@ -130,7 +196,10 @@ class OrcamentoDetailView(LoginRequiredMixin, DetailView):
             desconto_valor=desconto_valor,
         )
 
-        return redirect('clientes:orcamento_detail', pk=self.object.pk)
+        return redirect(
+            'clientes:orcamento_detail',
+            pk=self.object.pk
+        )
 
 
 @login_required
@@ -169,7 +238,7 @@ class OrcamentoDeleteView(LoginRequiredMixin, DeleteView):
 
     def get_queryset(self):
         # garante que só exclui orçamento da empresa do usuário
-        return Orcamento.objects.filter(empresa=self.request.user.empresa)
+        return Orcamento.objects.filter(empresa=self.request.user.perfil.empresa)
 
 
 class OrcamentoItemDeleteView(LoginRequiredMixin, DeleteView):
@@ -217,4 +286,16 @@ class OrcamentoPrintView(LoginRequiredMixin, DetailView):
         return Orcamento.objects.filter(
             empresa=self.request.user.empresa
         )
+
+
+###### VENDAS ######
+class VendaListView(LoginRequiredMixin, ListView):
+    model = Venda 
+    template_name = 'vendas/venda_list.html'
+    context_object_name = 'vendas'
+    
+    def get_queryset(self):
+        return Venda.objects.filter(
+            empresa = self.request.user.perfil.empresa
+        ).select_related('cliente', 'orcamento')
 

@@ -156,7 +156,7 @@ class Orcamento(models.Model):
         ('aprovado', 'Aprovado'),
         ('rejeitado', 'Rejeitado'),
     )
-    
+       
     empresa = models.ForeignKey(
         'empresas.Empresa',
         on_delete=models.CASCADE,
@@ -179,6 +179,24 @@ class Orcamento(models.Model):
     
     observacoes = models.TextField(blank=True, null=True)
     
+    TIPO_DESCONTO_GERAL_CHOICES = (
+        ('percentual', 'Percentual (%)'),
+        ('valor', 'Valor (R$)'),
+    )
+    
+    desconto_tipo = models.CharField(
+        max_length=20,
+        choices=TIPO_DESCONTO_GERAL_CHOICES,
+        blank=True,
+        null=True,
+    )
+    
+    desconto_valor = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00')
+    )  
+    
     criado_em = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -187,12 +205,44 @@ class Orcamento(models.Model):
     def __str__(self):
         return f'Orçamento #{self.id} - {self.cliente}'
     
-    def total(self):
+    def total_itens(self):
+        """
+        Soma dos subtotais dos itens (com desconto por item).
+        """
         return sum(
             (item.subtotal() for item in self.itens.all()),
             Decimal('0.00')
         )
         
+    def valor_desconto_geral(self):
+        """
+        Calcula o desconto aplicado AO ORÇAMENTO INTEIRO.
+        """
+        total = self.total_itens()
+
+        if not self.desconto_tipo or self.desconto_valor <= 0:
+            return Decimal('0.00')
+
+        if self.desconto_tipo == 'percentual':
+            return (total * self.desconto_valor) / Decimal('100')
+
+        return min(self.desconto_valor, total)
+
+    def total_com_desconto(self):
+        """
+        Total final do orçamento (itens - desconto geral).
+        """
+        return max(
+            self.total_itens() - self.valor_desconto_geral(),
+            Decimal('0.00')
+        )      
+        
+    def total(self):
+        """
+        Mantido por compatibilidade com código existente.
+        """
+        return self.total_itens()
+    
     
 class OrcamentoItem(models.Model):
     orcamento = models.ForeignKey(
@@ -259,3 +309,50 @@ class OrcamentoItem(models.Model):
         return f'{self.servico} ({self.quantidade}x)'
     
    
+########## VENDA ##########
+class Venda(models.Model):
+    STATUS_CHOICES = (
+        ('aberta', 'Aberta'),
+        ('faturada', 'Faturada'),
+        ('cancelada', 'Cancelada'),
+    )
+    
+    empresa = models.ForeignKey(
+        'empresas.Empresa',
+        on_delete=models.CASCADE,
+        related_name='vendas'
+    )
+
+    cliente = models.ForeignKey(
+        'clientes.Cliente',
+        on_delete=models.PROTECT,
+        related_name='vendas'
+    )
+    
+    orcamento = models.OneToOneField(
+        'clientes.Orcamento',
+        on_delete=models.CASCADE,
+        related_name='venda'
+    )
+    
+    data = models.DateField(auto_now_add=True)
+    
+    valor_total = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00')
+    )
+    
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='aberta'
+    )
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-data']
+        
+    def __str__(self):
+        return f'Venda #{self.id} - {self.cliente}'

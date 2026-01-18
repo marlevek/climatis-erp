@@ -8,13 +8,15 @@
 </a>
 
 {% if object_list %}
-<table class="table table-striped">
+<table class="table table-hover align-middle">
     <thead>
         <tr>
             <th>#</th>
             <th>Cliente</th>
             <th>Data</th>
             <th>Status</th>
+            <th class="text-end">Valor</th>
+            <th class="text-center">Ações</th>
         </tr>
     </thead>
     <tbody>
@@ -27,8 +29,42 @@
             </td>
 
             <td>{{ orcamento.cliente }}</td>
-            <td>{{ orcamento.data }}</td>
-            <td>{{ orcamento.get_status_display }}</td>
+
+            <td>{{ orcamento.data|date:"d/m/Y" }}</td>
+
+            <td>
+                <span class="badge bg-secondary">
+                    {{ orcamento.get_status_display }}
+                </span>
+            </td>
+
+            <td class="text-end">
+                R$ {{ orcamento.total_com_desconto|floatformat:2 }}
+            </td>
+
+            <td class="text-center">
+                <div class="btn-group btn-group-sm">
+                    <a href="{% url 'clientes:orcamento_detail' orcamento.id %}"
+                       class="btn btn-outline-primary"
+                       title="Editar">
+                        ✏️
+                    </a>
+
+                    <a href="{% url 'clientes:orcamento_print' orcamento.id %}"
+                       class="btn btn-outline-secondary"
+                       title="Imprimir"
+                       target="_blank">
+                        🖨
+                    </a>
+
+                    <a href="{% url 'clientes:orcamento_delete' orcamento.id %}"
+                       class="btn btn-outline-danger"
+                       title="Excluir"
+                       onclick="return confirm('Excluir este orçamento?')">
+                        🗑
+                    </a>
+                </div>
+            </td>
         </tr>
         {% endfor %}
     </tbody>

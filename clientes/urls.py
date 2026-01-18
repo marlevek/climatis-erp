@@ -13,7 +13,8 @@ from .views import (
     OrcamentoDeleteView,
     OrcamentoItemUpdateView,
     OrcamentoPrintView,
-    OrcamentoItemDeleteView  
+    OrcamentoItemDeleteView,
+    VendaListView,
 
 )
 
@@ -45,4 +46,6 @@ urlpatterns = [
     path('orcamentos/item/<int:pk>/editar', OrcamentoItemUpdateView.as_view(), name='orcamento_item_edit'),
     path('orcamentos/<int:pk>/imprimir/', OrcamentoPrintView.as_view(), name='orcamento_print'),
 
+    # Vendas
+    path('vendas/', VendaListView.as_view(), name='venda_list'),
 ]

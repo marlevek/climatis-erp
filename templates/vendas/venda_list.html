@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>Vendas</h2>
+
+{% if vendas %}
+<table class="table table-hover align-middle">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Cliente</th>
+            <th>Data</th>
+            <th>Status</th>
+            <th class="text-end">Valor</th>
+            <th class="text-center">Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for venda in vendas %}
+        <tr>
+            <td>#{{ venda.id }}</td>
+
+            <td>{{ venda.cliente }}</td>
+
+            <td>{{ venda.data|date:"d/m/Y" }}</td>
+
+            <td>
+                {% if venda.status == 'aberta' %}
+                <span class="badge bg-success">Aberta</span>
+                {% elif venda.status == 'faturada' %}
+                <span class="badge bg-primary">Faturada</span>
+                {% else %}
+                <span class="badge bg-secondary">Cancelada</span>
+                {% endif %}
+            </td>
+
+            <td class="text-end">
+                R$ {{ venda.valor_total|floatformat:2 }}
+            </td>
+
+            <td class="text-center">
+                <div class="d-flex justify-content-center gap-2">
+                    <a href="{% url 'clientes:orcamento_detail' venda.orcamento.id %}"
+                        class="btn btn-sm btn-outline-primary">
+                        Ver orçamento
+                    </a>
+
+                    <button class="btn btn-sm btn-outline-secondary" disabled title="Disponível em breve">
+                        Gerar NFS-e
+                    </button>
+                </div>
+            </td>
+
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Nenhuma venda registrada.</p>
+{% endif %}
+
+{% endblock %}
