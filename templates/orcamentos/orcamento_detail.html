@@ -7,6 +7,26 @@
 
 <hr>
 
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Orçamento #{{ object.id }}</h2>
+
+    <div class="btn-group">
+        <a href="{% url 'clientes:orcamento_list' %}" class="btn btn-outline-secondary">
+            Voltar
+        </a>
+
+        <a href="{% url 'clientes:orcamento_print' object.id %}" target="_blank" class="btn btn-outline-primary">
+            🖨 Imprimir
+        </a>
+
+        <a href="{% url 'clientes:orcamento_delete' object.id %}" class="btn btn-danger"
+            onclick="return confirm('Tem certeza que deseja excluir TODO o orçamento?')">
+            🗑 Excluir orçamento
+        </a>
+    </div>
+</div>
+
+
 <h4>Adicionar Serviço</h4>
 
 <form method="post">
@@ -69,6 +89,7 @@
             <th>Valor</th>
             <th>Desc</th>
             <th>Subtotal</th>
+            <th class="text-center">Ações</th>
         </tr>
     </thead>
     <tbody>
@@ -88,6 +109,18 @@
             </td>
             <td>R$ {{ item.subtotal|floatformat:2 }}</td>
         </tr>
+        <td class="text-center">
+            <a href="{% url 'clientes:orcamento_item_edit' item.id %}" class="btn btn-sm btn-outline-warning"
+                title="Editar item">
+                ✏️
+            </a>
+
+            <a href="{% url 'clientes:orcamento_item_delete' item.id %}" class="btn btn-sm btn-outline-danger"
+                title="Remover item">
+                🗑
+            </a>
+        </td>
+
         {% endfor %}
     </tbody>
 </table>

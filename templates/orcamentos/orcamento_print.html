@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Orçamento #{{ object.id }}</title>
+
+</head>
+
+<body>
+
+    <div class="header">
+        <div class="empresa">
+            {{ object.empresa.nome }}
+        </div>
+        <div>
+            Orçamento Nº {{ object.id }}<br>
+            Data: {{ object.data }}
+        </div>
+    </div>
+
+    <div class="dados">
+        <strong>Cliente:</strong> {{ object.cliente }}<br>
+
+        {% if object.cliente.cnpj %}
+        <strong>CNPJ:</strong> {{ object.cliente.cnpj }}<br>
+        {% elif object.cliente.cpf %}
+        <strong>CPF:</strong> {{ object.cliente.cpf }}<br>
+        {% endif %}
+
+        {% if object.observacoes %}
+        <br>
+        <strong>Observações:</strong><br>
+        {{ object.observacoes }}
+        {% endif %}
+    </div>
+
+    <h3>Serviços</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Serviço</th>
+                <th>Qtde</th>
+                <th>Valor unit.</th>
+                <th>Desconto</th>
+                <th>Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in object.itens.all %}
+            <tr>
+                <td>{{ item.servico.nome }}</td>
+                <td>{{ item.quantidade }}</td>
+                <td>R$ {{ item.valor_unitario|floatformat:2 }}</td>
+                <td>
+                    {% if item.desconto_percentual %}
+                    {{ item.desconto_percentual }} %
+                    {% elif item.desconto_valor %}
+                    R$ {{ item.desconto_valor|floatformat:2 }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+                <td>R$ {{ item.subtotal|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="total">
+        <tr>
+            <td>Total do orçamento</td>
+            <td style="text-align:right;">
+                R$ {{ object.total|floatformat:2 }}
+            </td>
+        </tr>
+    </table>
+
+    <div class="assinatura">
+        <div>
+            ___________________________________________<br>
+            Assinatura do cliente
+        </div>
+
+        <div>
+            {{ object.empresa.nome }}
+        </div>
+    </div>
+
+</body>
+
+</html>

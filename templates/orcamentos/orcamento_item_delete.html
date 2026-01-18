@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <h3 class="text-danger">Excluir item do orçamento</h3>
+
+    <p>
+        Você tem certeza que deseja excluir o item abaixo?
+    </p>
+
+    <ul class="list-group mb-3">
+        <li class="list-group-item">
+            <strong>Serviço:</strong> {{ object.servico.nome }}
+        </li>
+        <li class="list-group-item">
+            <strong>Quantidade:</strong> {{ object.quantidade }}
+        </li>
+        <li class="list-group-item">
+            <strong>Subtotal:</strong>
+            R$ {{ object.subtotal|floatformat:2 }}
+        </li>
+    </ul>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <a href="{% url 'clientes:orcamento_detail' object.orcamento.id %}"
+           class="btn btn-secondary">
+            Cancelar
+        </a>
+
+        <button type="submit" class="btn btn-danger">
+            Confirmar exclusão
+        </button>
+    </form>
+
+</div>
+
+{% endblock %}
