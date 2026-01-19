@@ -38,10 +38,9 @@
 
 <h5>Pagamento real</h5>
 
-<form method="post">
+<form method="post" id="form-pagamento-venda">
     {% csrf_token %}
     <input type="hidden" name="acao" value="salvar_pagamento_real">
-    <input type="hidden" name="parcelas_json" id="parcelas-json">
 
     <!-- LINHA PRINCIPAL -->
     <div class="row">
@@ -49,8 +48,12 @@
             <label>Tipo de pagamento</label>
             <select name="tipo_pagamento_real" id="tipo-pagamento-real" class="form-select">
                 <option value="">Selecione</option>
-                <option value="avista">À vista</option>
-                <option value="parcelado">Parcelado</option>
+                <option value="avista" {% if venda.tipo_pagamento_real == 'avista' %}selected{% endif %}>
+                    À vista
+                </option>
+                <option value="parcelado" {% if venda.tipo_pagamento_real == 'parcelado' %}selected{% endif %}>
+                    Parcelado
+                </option>
             </select>
         </div>
 
@@ -58,24 +61,25 @@
             <label>Forma de pagamento</label>
             <select name="forma_pagamento" id="forma-pagamento" class="form-select">
                 <option value="">Selecione</option>
-                <option value="dinheiro">Dinheiro</option>
-                <option value="pix">PIX</option>
-                <option value="cartao_credito">Cartão crédito</option>
-                <option value="cartao_debito">Cartão débito</option>
-                <option value="boleto">Boleto</option>
-                <option value="transferencia">Transferência</option>
+                <option value="dinheiro" {% if venda.forma_pagamento == 'dinheiro' %}selected{% endif %}>Dinheiro</option>
+                <option value="pix" {% if venda.forma_pagamento == 'pix' %}selected{% endif %}>PIX</option>
+                <option value="cartao_credito" {% if venda.forma_pagamento == 'cartao_credito' %}selected{% endif %}>Cartão crédito</option>
+                <option value="cartao_debito" {% if venda.forma_pagamento == 'cartao_debito' %}selected{% endif %}>Cartão débito</option>
+                <option value="boleto" {% if venda.forma_pagamento == 'boleto' %}selected{% endif %}>Boleto</option>
+                <option value="transferencia" {% if venda.forma_pagamento == 'transferencia' %}selected{% endif %}>Transferência</option>
             </select>
         </div>
 
         <div class="col-md-3">
             <label>Data do pagamento</label>
-            <input type="date" name="data_pagamento" id="data-pagamento" class="form-control">
+            <input type="date" name="data_pagamento" id="data-pagamento" class="form-control" 
+                   value="{{ venda.data_pagamento|date:'Y-m-d'|default:'' }}">
         </div>
 
         <div class="col-md-3">
             <label>Valor</label>
             <input type="number" step="0.01" name="valor_pagamento" id="valor-pagamento" class="form-control"
-                value="{{ venda.valor_total }}">
+                value="{{ venda.valor_pagamento|default:venda.valor_total }}">
         </div>
     </div>
 
@@ -87,7 +91,7 @@
         <div class="row align-items-end">
             <div class="col-md-2">
                 <label>Qtd. parcelas</label>
-                <input type="number" id="qtd-parcelas" class="form-control" min="2" value="2">
+                <input type="number" id="qtd-parcelas" class="form-control" min="2" value="{{ qtd_parcelas|default:2 }}">
             </div>
 
             <div class="col-md-2">
@@ -154,143 +158,209 @@
             💾 Salvar pagamento
         </button>
     </div>
+</form>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
+<!-- 🔥 DADOS DO BACKEND (parcelas já salvas) -->
+{% if pagamento_existe %}
+<script id="parcelas-backend" type="application/json">
+[
+{% for p in parcelas %}
+{
+  "numero": {{ p.numero }},
+  "data": "{{ p.data_vencimento|date:'Y-m-d' }}",
+  "valor": "{{ p.valor }}",
+  "forma_pagamento": "{{ p.forma_pagamento|default:'' }}",
+  "observacao": "{{ p.observacao|default:'' }}",
+  "status": "{{ p.status }}"
+}{% if not forloop.last %},{% endif %}
+{% endfor %}
+]
+</script>
+{% endif %}
 
-            const tipo = document.getElementById('tipo-pagamento-real');
-            const blocoParcelamento = document.getElementById('bloco-parcelamento');
-            const blocoParcelas = document.getElementById('bloco-parcelas-geradas');
-            const btnGerar = document.getElementById('btn-gerar-parcelas');
-            const parcelasBody = document.getElementById('parcelas-body');
-            const parcelasJson = document.getElementById('parcelas-json');
-            const form = document.querySelector('form');
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
 
-            function toggleParcelamento() {
-                if (tipo.value === 'parcelado') {
-                    blocoParcelamento.style.display = 'block';
-                } else {
-                    blocoParcelamento.style.display = 'none';
+        const parcelasScript = document.getElementById('parcelas-backend');
+        const temParcelasSalvas = !!parcelasScript;
+
+        console.log('🔍 temParcelasSalvas:', temParcelasSalvas);
+
+        const tipo = document.getElementById('tipo-pagamento-real');
+        const blocoParcelamento = document.getElementById('bloco-parcelamento');
+        const blocoParcelas = document.getElementById('bloco-parcelas-geradas');
+        const btnGerar = document.getElementById('btn-gerar-parcelas');
+        const parcelasBody = document.getElementById('parcelas-body');
+        const parcelasJson = document.getElementById('parcelas-json');
+        const form = document.getElementById('form-pagamento-venda');
+
+        /* ==========================
+           🔥 CARREGAR PARCELAS SALVAS
+        ========================== */
+        if (temParcelasSalvas) {
+            const parcelasSalvas = JSON.parse(parcelasScript.textContent);
+            console.log('📦 Parcelas do backend:', parcelasSalvas);
+
+            blocoParcelas.style.display = 'block';
+            
+            parcelasSalvas.forEach((p, index) => {
+                parcelasBody.insertAdjacentHTML('beforeend', `
+                    <tr>
+                        <td>${p.numero}</td>
+                        <td><input type="date" class="form-control form-control-sm parcela-data"
+                                   value="${p.data}"></td>
+                        <td><input type="number" step="0.01"
+                                   class="form-control form-control-sm parcela-valor"
+                                   value="${p.valor}"></td>
+                        <td>
+                            <select class="form-select form-select-sm parcela-forma">
+                                <option value="">—</option>
+                                <option value="pix" ${p.forma_pagamento === 'pix' ? 'selected' : ''}>PIX</option>
+                                <option value="boleto" ${p.forma_pagamento === 'boleto' ? 'selected' : ''}>Boleto</option>
+                                <option value="dinheiro" ${p.forma_pagamento === 'dinheiro' ? 'selected' : ''}>Dinheiro</option>
+                                <option value="cartao_credito" ${p.forma_pagamento === 'cartao_credito' ? 'selected' : ''}>Cartão crédito</option>
+                                <option value="cartao_debito" ${p.forma_pagamento === 'cartao_debito' ? 'selected' : ''}>Cartão débito</option>
+                                <option value="transferencia" ${p.forma_pagamento === 'transferencia' ? 'selected' : ''}>Transferência</option>
+                            </select>
+                        </td>
+                        <td><input type="text" class="form-control form-control-sm parcela-obs"
+                                   value="${p.observacao || ''}"></td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    onclick="this.closest('tr').remove()">✖</button>
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        /* ==========================
+           VISIBILIDADE
+        ========================== */
+        function toggleParcelamento() {
+            if (tipo.value === 'parcelado') {
+                blocoParcelamento.style.display = 'block';
+                
+                // 🔥 Se já tem parcelas salvas, mostrar a tabela
+                if (temParcelasSalvas) {
+                    blocoParcelas.style.display = 'block';
+                }
+            } else {
+                blocoParcelamento.style.display = 'none';
+                
+                // 🔥 Só limpa se não tem parcelas salvas
+                if (!temParcelasSalvas) {
                     blocoParcelas.style.display = 'none';
                     parcelasBody.innerHTML = '';
                     parcelasJson.value = '';
                 }
             }
+        }
 
-            tipo.addEventListener('change', toggleParcelamento);
-            toggleParcelamento();
+        tipo.addEventListener('change', toggleParcelamento);
+        toggleParcelamento(); // 🔥 Chama ao carregar a página
 
-            // GERAR PARCELAS (SEM RELOAD)
-            btnGerar.addEventListener('click', function (e) {
-                e.preventDefault();
+        /* ==========================
+           GERAR PARCELAS (JS)
+        ========================== */
+        btnGerar.addEventListener('click', function (e) {
+            e.preventDefault();
 
-                const total = parseFloat(document.getElementById('valor-pagamento').value);
-                const entradaInput = document.getElementById('valor-entrada').value.trim();
-                const temEntrada = entradaInput !== '';
-                const entrada = temEntrada ? parseFloat(entradaInput.replace(',', '.')) : null;
+            const total = parseFloat(document.getElementById('valor-pagamento').value);
+            const entradaRaw = document.getElementById('valor-entrada').value;
+            const entrada = entradaRaw ? parseFloat(entradaRaw) : null;
 
-                const qtd = parseInt(document.getElementById('qtd-parcelas').value);
-                const intervalo = parseInt(document.getElementById('intervalo-dias').value);
-                const dataBaseStr = document.getElementById('data-primeira').value;
+            const qtd = parseInt(document.getElementById('qtd-parcelas').value);
+            const intervalo = parseInt(document.getElementById('intervalo-dias').value) || 30;
+            let dataBaseStr = document.getElementById('data-primeira').value;
 
-                if (!total || !qtd || !dataBaseStr || qtd < 2) {
-                    alert('Preencha corretamente os dados de parcelamento.');
-                    return;
-                }
+            if (!total || !qtd || qtd < 1) {
+                alert('Informe valor total e quantidade de parcelas.');
+                return;
+            }
 
-                if (entrada < 0 || entrada > total) {
-                    alert('Valor da 1ª parcela inválido.');
-                    return;
-                }
+            if (!dataBaseStr) {
+                const hoje = new Date();
+                dataBaseStr = hoje.toISOString().slice(0, 10);
+                document.getElementById('data-primeira').value = dataBaseStr;
+            }
 
-                parcelasBody.innerHTML = '';
-                blocoParcelas.style.display = 'block';
+            parcelasBody.innerHTML = '';
+            blocoParcelas.style.display = 'block';
 
-                const dataBase = new Date(dataBaseStr);
-                let valorPrimeira;
-                let valorDemais;
+            const dataBase = new Date(dataBaseStr);
 
-                if (!temEntrada) {
-                    // 🔥 SEM ENTRADA → divide igualmente
-                    const valorIgual = (total / qtd).toFixed(2);
-                    valorPrimeira = valorIgual;
-                    valorDemais = valorIgual;
-                } else {
-                    // COM ENTRADA
-                    const restante = total - entrada;
-                    const qtdRestante = qtd - 1;
-                    const valorRestante = (restante / qtdRestante).toFixed(2);
-                    valorPrimeira = entrada.toFixed(2);
-                    valorDemais = valorRestante;
-                }
+            let valorPrimeira, valorDemais;
 
-                for (let i = 0; i < qtd; i++) {
-                    const data = new Date(dataBase);
-                    data.setDate(data.getDate() + (i * intervalo));
-                    const dataStr = data.toISOString().slice(0, 10);
+            if (!entrada) {
+                valorPrimeira = (total / qtd).toFixed(2);
+                valorDemais = valorPrimeira;
+            } else {
+                valorPrimeira = entrada.toFixed(2);
+                const restante = total - entrada;
+                valorDemais = (restante / (qtd - 1)).toFixed(2);
+            }
 
-                    const valor = (i === 0) ? valorPrimeira : valorDemais;
+            for (let i = 0; i < qtd; i++) {
+                const data = new Date(dataBase);
+                data.setDate(data.getDate() + (i * intervalo));
 
-                    parcelasBody.insertAdjacentHTML('beforeend', `
-                <tr>
-                    <td>${i + 1}</td>
-                    <td>
-                        <input type="date"
-                               class="form-control form-control-sm parcela-data"
-                               value="${dataStr}">
-                    </td>
-                    <td>
-                        <input type="number"
-                               step="0.01"
-                               class="form-control form-control-sm parcela-valor"
-                               value="${valor}">
-                    </td>
-                    <td>
-                        <select class="form-select form-select-sm parcela-forma">
-                            <option value="">—</option>
-                            <option value="pix">PIX</option>
-                            <option value="boleto">Boleto</option>
-                            <option value="dinheiro">Dinheiro</option>
-                            <option value="cartao_credito">Cartão crédito</option>
-                            <option value="cartao_debito">Cartão débito</option>
-                            <option value="transferencia">Transferência</option>
-                        </select>
-                    </td>
-                    <td>
-                        <input type="text"
-                               class="form-control form-control-sm parcela-obs"
-                               placeholder="Obs. da parcela">
-                    </td>
-                    <td class="text-center">
-                        <button type="button"
-                                class="btn btn-sm btn-outline-danger"
-                                onclick="this.closest('tr').remove()">✖</button>
-                    </td>
-                </tr>
-            `);
-                }
-            });
+                const valor = (i === 0) ? valorPrimeira : valorDemais;
 
-            // ANTES DE SALVAR → MONTA O JSON DAS PARCELAS
-            form.addEventListener('submit', function () {
-
-                const linhas = parcelasBody.querySelectorAll('tr');
-                const parcelas = [];
-
-                linhas.forEach((linha, index) => {
-                    parcelas.push({
-                        numero: index + 1,
-                        data: linha.querySelector('.parcela-data').value,
-                        valor: linha.querySelector('.parcela-valor').value,
-                        forma_pagamento: linha.querySelector('.parcela-forma').value,
-                        observacao: linha.querySelector('.parcela-obs').value
-                    });
-                });
-
-                parcelasJson.value = JSON.stringify(parcelas);
-            });
-
+                parcelasBody.insertAdjacentHTML('beforeend', `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td><input type="date" class="form-control form-control-sm parcela-data"
+                                   value="${data.toISOString().slice(0, 10)}"></td>
+                        <td><input type="number" step="0.01"
+                                   class="form-control form-control-sm parcela-valor"
+                                   value="${valor}"></td>
+                        <td>
+                            <select class="form-select form-select-sm parcela-forma">
+                                <option value="">—</option>
+                                <option value="pix">PIX</option>
+                                <option value="boleto">Boleto</option>
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="cartao_credito">Cartão crédito</option>
+                                <option value="cartao_debito">Cartão débito</option>
+                                <option value="transferencia">Transferência</option>
+                            </select>
+                        </td>
+                        <td><input type="text" class="form-control form-control-sm parcela-obs"></td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    onclick="this.closest('tr').remove()">✖</button>
+                        </td>
+                    </tr>
+                `);
+            }
         });
-    </script>
 
-    {% endblock %}
+        /* ==========================
+           SUBMIT → MONTA parcelas_json
+        ========================== */
+        form.addEventListener('submit', function(e) {
+            console.log('🚀 Form submit disparado!');
+            
+            const linhas = parcelasBody.querySelectorAll('tr');
+            const parcelas = [];
+
+            linhas.forEach((linha, index) => {
+                parcelas.push({
+                    numero: index + 1,
+                    data: linha.querySelector('.parcela-data').value,
+                    valor: linha.querySelector('.parcela-valor').value,
+                    forma_pagamento: linha.querySelector('.parcela-forma').value,
+                    observacao: linha.querySelector('.parcela-obs').value
+                });
+            });
+
+            parcelasJson.value = JSON.stringify(parcelas);
+
+            console.log('📦 Parcelas montadas:', parcelas.length);
+            console.log('📦 parcelas_json:', parcelasJson.value);
+        });
+    });
+</script>
+
+{% endblock %}

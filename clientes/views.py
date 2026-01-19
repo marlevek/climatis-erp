@@ -1,6 +1,6 @@
 from django.urls import reverse_lazy
 import json
-from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
+from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView, TemplateView
 from .models import Cliente
 from .forms import ClienteForm
 from clientes.models import Servico, Orcamento, OrcamentoItem, Venda, Parcelamento
@@ -15,6 +15,7 @@ from decimal import Decimal
 from datetime import timedelta, datetime
 from django.utils import timezone
 from django.db import models
+from django.db.models import Sum
 
 
 
@@ -330,89 +331,108 @@ class VendaDetailView(LoginRequiredMixin, DetailView):
     model = Venda
     template_name = 'vendas/venda_detail.html'
     context_object_name = 'venda'
-
+    
     def get_queryset(self):
+        """Filtra apenas vendas da empresa do usuário"""
         return Venda.objects.filter(
             empresa=self.request.user.perfil.empresa
         ).select_related('cliente', 'orcamento')
-        
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         venda = self.object
         
+        # Buscar parcelas
         parcelas = venda.parcelas.all().order_by('numero')
         
+        print(f'\n🔍 ===== GET CONTEXT DATA =====')
+        print(f'🔍 Venda ID: {venda.id}')
+        print(f'🔍 Tipo pagamento real: {venda.tipo_pagamento_real}')
+        print(f'🔍 Forma pagamento: {venda.forma_pagamento}')
+        print(f'🔍 Total parcelas: {parcelas.count()}')
+        if parcelas.exists():
+            for p in parcelas:
+                print(f'   - Parcela #{p.numero}: R$ {p.valor} - {p.data_vencimento} - {p.forma_pagamento}')
+        print(f'🔍 ==============================\n')
+
+        context['parcelas'] = parcelas
         context['pagamento_existe'] = parcelas.exists()
-        context['parcelas'] = parcelas 
         context['qtd_parcelas'] = parcelas.count()
-        
         context['valor_total_parcelas'] = (
-            parcelas.aggregate(
-                total = models.Sum('valor')
-            )['total'] or Decimal('0.00')
+            parcelas.aggregate(total=Sum('valor'))['total']
+            or Decimal('0.00')
         )
 
-        context['tipo_pagamento_real'] = venda.tipo_pagamento_real
-        
-        return context 
+        return context
     
     def post(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        acao = request.POST.get('acao')
+        """Processa o salvamento do pagamento"""
+        venda = self.get_object()
+        
+        print(f'\n🔥 ===== POST RECEBIDO =====')
+        print(f'🔥 Venda ID: {venda.id}')
+        
+        parcelas_json = request.POST.get('parcelas_json', '').strip()
+        
+        # Salvar dados principais
+        venda.tipo_pagamento_real = request.POST.get('tipo_pagamento_real')
+        venda.forma_pagamento = request.POST.get('forma_pagamento')
+        
+        # 🔥 Salvar data_pagamento se existir
+        data_pagamento = request.POST.get('data_pagamento')
+        if data_pagamento:
+            venda.data_pagamento = data_pagamento
+        
+        # 🔥 Salvar valor_pagamento
+        valor_pagamento = request.POST.get('valor_pagamento')
+        if valor_pagamento:
+            venda.valor_pagamento = Decimal(valor_pagamento)
+        
+        venda.observacoes_pagamento_real = request.POST.get('observacoes_pagamento')
+        venda.save()
+        
+        print(f'🔥 Tipo pagamento: {venda.tipo_pagamento_real}')
+        print(f'🔥 Forma pagamento: {venda.forma_pagamento}')
+        print(f'🔥 Data pagamento: {venda.data_pagamento}')
+        print(f'🔥 Valor pagamento: {venda.valor_pagamento}')
 
-        if acao != 'salvar_pagamento_real':
-            return redirect(
-                'clientes:venda_detail',
-                pk=self.object.pk
-            )
+        # Processar parcelas
+        if parcelas_json:
+            print(f'🔥 JSON recebido (primeiros 200 chars): {parcelas_json[:200]}')
+            
+            # Deletar parcelas antigas
+            qtd_antigas = venda.parcelas.count()
+            venda.parcelas.all().delete()
+            print(f'🔥 Deletadas {qtd_antigas} parcelas antigas')
 
-        self.object.tipo_pagamento_real = request.POST.get(
-            'tipo_pagamento_real'
-        ) or None
+            try:
+                parcelas = json.loads(parcelas_json)
+                print(f'🔥 Criando {len(parcelas)} novas parcelas...')
+                
+                for p in parcelas:
+                    parcela = Parcelamento.objects.create(
+                        venda=venda,
+                        numero=int(p['numero']),
+                        valor=Decimal(str(p['valor']).replace(',', '.')),
+                        data_vencimento=p['data'],
+                        forma_pagamento=p.get('forma_pagamento', ''),
+                        observacao=p.get('observacao', ''),
+                        status='pendente'
+                    )
+                    print(f'   ✅ Parcela #{parcela.numero}: R$ {parcela.valor} - {parcela.data_vencimento} - {parcela.forma_pagamento}')
+                
+                # Confirmar salvamento
+                total_agora = venda.parcelas.count()
+                print(f'🔥 Total de parcelas salvas: {total_agora}')
+                
+            except json.JSONDecodeError as e:
+                print(f'❌ ERRO ao parsear JSON: {e}')
+            except Exception as e:
+                print(f'❌ ERRO ao criar parcelas: {e}')
+        else:
+            print(f'🔥 Nenhuma parcela enviada (JSON vazio)')
+        
+        print(f'🔥 ==========================\n')
 
-        self.object.observacoes_pagamento_real = request.POST.get(
-            'observacoes_pagamento'
-        )
-
-        self.object.save()
-
-        parcelas_json = request.POST.get('parcelas_json')
-
-        if self.object.tipo_pagamento_real == 'parcelado' and parcelas_json:
-            parcelas_payload = json.loads(parcelas_json)
-
-            qtd = len(parcelas_payload)
-
-            data_primeira = datetime.strptime(
-                parcelas_payload[0]['data'],
-                '%Y-%m-%d'
-            ).date()
-
-            intervalo = 0
-            if qtd > 1:
-                data_segunda = datetime.strptime(
-                    parcelas_payload[1]['data'],
-                    '%Y-%m-%d'
-                ).date()
-                intervalo = (data_segunda - data_primeira).days
-
-            self.object.gerar_parcelas(
-                qtd_parcelas=qtd,
-                data_primeira=data_primeira,
-                intervalo_dias=intervalo,
-                parcelas_payload=parcelas_payload
-            )
-
-        if self.object.tipo_pagamento_real == 'avista':
-            self.object.gerar_parcelas(
-                qtd_parcelas=1,
-                data_primeira=timezone.now().date(),
-                intervalo_dias=0
-            )
-
-        return redirect(
-            'clientes:venda_detail',
-            pk=self.object.pk
-        )
-
-
+        # Redireciona de volta para a mesma página
+        return redirect('clientes:venda_list')
