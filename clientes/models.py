@@ -2,6 +2,7 @@ from django.db import models
 from django.db.models import Max
 from empresas.models import Empresa 
 from decimal import Decimal
+from datetime import timedelta
 import re 
 
 
@@ -437,6 +438,92 @@ class Venda(models.Model):
     )
 
     criado_em = models.DateTimeField(auto_now_add=True)
+    
+    def gerar_parcelas(
+        self,
+        qtd_parcelas,
+        data_primeira,
+        intervalo_dias,
+        parcelas_payload=None
+    ):
+        """
+    Gera parcelas de forma profissional.
+    Se parcelas_payload não tiver valor da 1ª parcela,
+    divide o valor total igualmente.
+    """
+
+        # limpeza segura
+        self.parcelas.all().delete()
+
+        valor_total = self.valor_total
+
+        # Caso não venha payload (ex: backend puro)
+        if not parcelas_payload:
+            valor_parcela = (valor_total / qtd_parcelas).quantize(Decimal('0.01'))
+
+            for i in range(qtd_parcelas):
+                Parcelamento.objects.create(
+                    venda=self,
+                    numero=i + 1,
+                    valor=valor_parcela,
+                    data_vencimento=data_primeira + timedelta(days=i * intervalo_dias),
+                    status='pendente'
+                )
+            return
+
+        # Caso venha payload do frontend
+        primeira = parcelas_payload[0]
+        valor_primeira_raw = (primeira.get('valor') or '').strip()
+        
+        try:
+            valor_primeira = Decimal(
+                valor_primeira_raw.replace(',', '.')
+            )
+        except:
+            valor_primeira = Decimal('0.00')
+
+        # REGRA-CHAVE
+        if valor_primeira_raw <= Decimal('0.00'):
+            valor_parcela = (valor_total / qtd_parcelas).quantize(Decimal('0.01'))
+
+            for i in range(qtd_parcelas):
+                Parcelamento.objects.create(
+                    venda=self,
+                    numero=i + 1,
+                    valor=valor_parcela,
+                    data_vencimento=data_primeira + timedelta(days=i * intervalo_dias),
+                    forma_pagamento=primeira.get('forma_pagamento'),
+                    observacao=primeira.get('observacao') or '',
+                    status='pendente'
+                )
+            return
+
+        # Caso exista entrada
+        restante = valor_total - valor_primeira
+        qtd_restante = qtd_parcelas - 1
+
+        if qtd_restante <= 0:
+            return
+
+        valor_restante = (restante / qtd_restante).quantize(Decimal('0.01'))
+
+        for i in range(qtd_parcelas):
+            if i == 0:
+                valor = valor_primeira
+            else:
+                valor = valor_restante
+
+            data = data_primeira + timedelta(days=i * intervalo_dias)
+
+            Parcelamento.objects.create(
+                venda=self,
+                numero=i + 1,
+                valor=valor,
+                data_vencimento=data,
+                forma_pagamento=parcelas_payload[i].get('forma_pagamento'),
+                observacao=parcelas_payload[i].get('observacao') or '',
+                status='pendente'
+            )
 
     class Meta:
         ordering = ['-data']

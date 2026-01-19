@@ -113,110 +113,125 @@
         </div>
     </div>
 
- <!-- PARCELAS GERADAS -->
-<div id="bloco-parcelas-geradas" class="mt-4" style="display:none;">
-    <h6>Parcelas geradas</h6>
+    <!-- PARCELAS GERADAS -->
+    <div id="bloco-parcelas-geradas" class="mt-4" style="display:none;">
+        <h6>Parcelas geradas</h6>
 
-    <table class="table table-bordered table-sm align-middle">
-        <thead class="table-light">
-            <tr>
-                <th>#</th>
-                <th>Vencimento</th>
-                <th>Valor</th>
-                <th>Forma de pagamento</th>
-                <th>Observação</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody id="parcelas-body">
-            <!-- linhas geradas via JS -->
-        </tbody>
-    </table>
-</div>
+        <table class="table table-bordered table-sm align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>Vencimento</th>
+                    <th>Valor</th>
+                    <th>Forma de pagamento</th>
+                    <th>Observação</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="parcelas-body">
+                <!-- linhas geradas via JS -->
+            </tbody>
+        </table>
+    </div>
 
-<!-- JSON DAS PARCELAS (ENVIADO PARA O BACKEND) -->
-<input type="hidden" name="parcelas_json" id="parcelas-json">
+    <!-- JSON DAS PARCELAS (ENVIADO PARA O BACKEND) -->
+    <input type="hidden" name="parcelas_json" id="parcelas-json">
 
-<!-- OBSERVAÇÕES GERAIS -->
-<div class="mt-3">
-    <label>Observações gerais do pagamento</label>
-    <textarea name="observacoes_pagamento"
-              class="form-control"
-              rows="2">{{ venda.observacoes_pagamento_real|default_if_none:'' }}</textarea>
-</div>
+    <!-- OBSERVAÇÕES GERAIS -->
+    <div class="mt-3">
+        <label>Observações gerais do pagamento</label>
+        <textarea name="observacoes_pagamento" class="form-control"
+            rows="2">{{ venda.observacoes_pagamento_real|default_if_none:'' }}</textarea>
+    </div>
 
-<!-- BOTÕES -->
-<div class="mt-4 d-flex justify-content-between">
-    <a href="{% url 'clientes:venda_list' %}" class="btn btn-outline-secondary">
-        Voltar
-    </a>
+    <!-- BOTÕES -->
+    <div class="mt-4 d-flex justify-content-between">
+        <a href="{% url 'clientes:venda_list' %}" class="btn btn-outline-secondary">
+            Voltar
+        </a>
 
-    <button type="submit" class="btn btn-success">
-        💾 Salvar pagamento
-    </button>
-</div>
+        <button type="submit" class="btn btn-success">
+            💾 Salvar pagamento
+        </button>
+    </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
 
-    const tipo = document.getElementById('tipo-pagamento-real');
-    const blocoParcelamento = document.getElementById('bloco-parcelamento');
-    const blocoParcelas = document.getElementById('bloco-parcelas-geradas');
-    const btnGerar = document.getElementById('btn-gerar-parcelas');
-    const parcelasBody = document.getElementById('parcelas-body');
-    const parcelasJson = document.getElementById('parcelas-json');
-    const form = document.querySelector('form');
+            const tipo = document.getElementById('tipo-pagamento-real');
+            const blocoParcelamento = document.getElementById('bloco-parcelamento');
+            const blocoParcelas = document.getElementById('bloco-parcelas-geradas');
+            const btnGerar = document.getElementById('btn-gerar-parcelas');
+            const parcelasBody = document.getElementById('parcelas-body');
+            const parcelasJson = document.getElementById('parcelas-json');
+            const form = document.querySelector('form');
 
-    function toggleParcelamento() {
-        if (tipo.value === 'parcelado') {
-            blocoParcelamento.style.display = 'block';
-        } else {
-            blocoParcelamento.style.display = 'none';
-            blocoParcelas.style.display = 'none';
-            parcelasBody.innerHTML = '';
-            parcelasJson.value = '';
-        }
-    }
+            function toggleParcelamento() {
+                if (tipo.value === 'parcelado') {
+                    blocoParcelamento.style.display = 'block';
+                } else {
+                    blocoParcelamento.style.display = 'none';
+                    blocoParcelas.style.display = 'none';
+                    parcelasBody.innerHTML = '';
+                    parcelasJson.value = '';
+                }
+            }
 
-    tipo.addEventListener('change', toggleParcelamento);
-    toggleParcelamento();
+            tipo.addEventListener('change', toggleParcelamento);
+            toggleParcelamento();
 
-    // GERAR PARCELAS (SEM RELOAD)
-    btnGerar.addEventListener('click', function (e) {
-        e.preventDefault();
+            // GERAR PARCELAS (SEM RELOAD)
+            btnGerar.addEventListener('click', function (e) {
+                e.preventDefault();
 
-        const total = parseFloat(document.getElementById('valor-pagamento').value);
-        const entrada = parseFloat(document.getElementById('valor-entrada').value) || 0;
-        const qtd = parseInt(document.getElementById('qtd-parcelas').value);
-        const intervalo = parseInt(document.getElementById('intervalo-dias').value);
-        const dataBaseStr = document.getElementById('data-primeira').value;
+                const total = parseFloat(document.getElementById('valor-pagamento').value);
+                const entradaInput = document.getElementById('valor-entrada').value.trim();
+                const temEntrada = entradaInput !== '';
+                const entrada = temEntrada ? parseFloat(entradaInput.replace(',', '.')) : null;
 
-        if (!total || !qtd || !dataBaseStr || qtd < 2) {
-            alert('Preencha corretamente os dados de parcelamento.');
-            return;
-        }
+                const qtd = parseInt(document.getElementById('qtd-parcelas').value);
+                const intervalo = parseInt(document.getElementById('intervalo-dias').value);
+                const dataBaseStr = document.getElementById('data-primeira').value;
 
-        if (entrada < 0 || entrada > total) {
-            alert('Valor da 1ª parcela inválido.');
-            return;
-        }
+                if (!total || !qtd || !dataBaseStr || qtd < 2) {
+                    alert('Preencha corretamente os dados de parcelamento.');
+                    return;
+                }
 
-        parcelasBody.innerHTML = '';
-        blocoParcelas.style.display = 'block';
+                if (entrada < 0 || entrada > total) {
+                    alert('Valor da 1ª parcela inválido.');
+                    return;
+                }
 
-        const dataBase = new Date(dataBaseStr);
-        const restante = total - entrada;
-        const qtdRestante = qtd - 1;
-        const valorRestante = (restante / qtdRestante).toFixed(2);
+                parcelasBody.innerHTML = '';
+                blocoParcelas.style.display = 'block';
 
-        for (let i = 0; i < qtd; i++) {
-            const data = new Date(dataBase);
-            data.setDate(data.getDate() + (i * intervalo));
-            const dataStr = data.toISOString().slice(0, 10);
+                const dataBase = new Date(dataBaseStr);
+                let valorPrimeira;
+                let valorDemais;
 
-            const valor = (i === 0) ? entrada.toFixed(2) : valorRestante;
+                if (!temEntrada) {
+                    // 🔥 SEM ENTRADA → divide igualmente
+                    const valorIgual = (total / qtd).toFixed(2);
+                    valorPrimeira = valorIgual;
+                    valorDemais = valorIgual;
+                } else {
+                    // COM ENTRADA
+                    const restante = total - entrada;
+                    const qtdRestante = qtd - 1;
+                    const valorRestante = (restante / qtdRestante).toFixed(2);
+                    valorPrimeira = entrada.toFixed(2);
+                    valorDemais = valorRestante;
+                }
 
-            parcelasBody.insertAdjacentHTML('beforeend', `
+                for (let i = 0; i < qtd; i++) {
+                    const data = new Date(dataBase);
+                    data.setDate(data.getDate() + (i * intervalo));
+                    const dataStr = data.toISOString().slice(0, 10);
+
+                    const valor = (i === 0) ? valorPrimeira : valorDemais;
+
+                    parcelasBody.insertAdjacentHTML('beforeend', `
                 <tr>
                     <td>${i + 1}</td>
                     <td>
@@ -253,29 +268,29 @@ document.addEventListener('DOMContentLoaded', function () {
                     </td>
                 </tr>
             `);
-        }
-    });
-
-    // ANTES DE SALVAR → MONTA O JSON DAS PARCELAS
-    form.addEventListener('submit', function () {
-
-        const linhas = parcelasBody.querySelectorAll('tr');
-        const parcelas = [];
-
-        linhas.forEach((linha, index) => {
-            parcelas.push({
-                numero: index + 1,
-                data: linha.querySelector('.parcela-data').value,
-                valor: linha.querySelector('.parcela-valor').value,
-                forma_pagamento: linha.querySelector('.parcela-forma').value,
-                observacao: linha.querySelector('.parcela-obs').value
+                }
             });
+
+            // ANTES DE SALVAR → MONTA O JSON DAS PARCELAS
+            form.addEventListener('submit', function () {
+
+                const linhas = parcelasBody.querySelectorAll('tr');
+                const parcelas = [];
+
+                linhas.forEach((linha, index) => {
+                    parcelas.push({
+                        numero: index + 1,
+                        data: linha.querySelector('.parcela-data').value,
+                        valor: linha.querySelector('.parcela-valor').value,
+                        forma_pagamento: linha.querySelector('.parcela-forma').value,
+                        observacao: linha.querySelector('.parcela-obs').value
+                    });
+                });
+
+                parcelasJson.value = JSON.stringify(parcelas);
+            });
+
         });
+    </script>
 
-        parcelasJson.value = JSON.stringify(parcelas);
-    });
-
-});
-</script>
-
-{% endblock %}
+    {% endblock %}
