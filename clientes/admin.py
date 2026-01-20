@@ -2,6 +2,12 @@ from django.contrib import admin
 from .models import Cliente, Fornecedor, Servico, Orcamento, OrcamentoItem, Venda, Parcelamento
 
 
+
+# Inline das parcelas
+class ParcelaInline(admin.TabularInline):
+    model = Parcelamento 
+    extra = 0
+
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
     list_display = ('nome', 'documento', 'tipo_pessoa', 'ativo')
@@ -49,8 +55,16 @@ class VendaAdmin(admin.ModelAdmin):
         'status',
         'criado_em',
     )
-
-
+    readonly_fields = ('status_financeiro',)
+    inlines = [ParcelaInline]
+    
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        
+        venda = form.instance         
+        venda.atualizar_status_financeiro()
+        
+    
 @admin.register(Parcelamento)
 class ParcelamentoAdmin(admin.ModelAdmin):
     list_display = (
@@ -60,3 +74,6 @@ class ParcelamentoAdmin(admin.ModelAdmin):
         'data_vencimento',
         'status',
     )
+
+
+    

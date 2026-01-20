@@ -350,7 +350,50 @@ class Venda(models.Model):
         ('avista', 'À vista'),
         ('parcelado', 'Parcelado'),
     )
-
+    
+    STATUS_FINANCEIRO_CHOICES = (
+        ('aberta', 'Aberta'),
+        ('parcial', 'Parcial'),
+        ('quitada', 'Quitada'),
+    )
+    
+    status_financeiro = models.CharField(
+        max_length=10,
+        choices=STATUS_FINANCEIRO_CHOICES,
+        default='aberta'
+    )
+    
+    def calcular_status_financeiro(self):
+        """
+    Calcula o status financeiro da venda com base nas parcelas.
+    Regra:
+    - Aberta: nenhuma parcela paga
+    - Parcial: ao menos uma paga e ainda existe parcela em aberto
+    - Quitada: todas pagas
+    """
+        parcelas_validas = self.parcelas.exclude(status='cancelada')
+        
+        # se não há parcelas válidas, considera aberta
+        if not parcelas_validas.exists():
+            return 'aberta'
+        
+        total = parcelas_validas.count()
+        pagas = parcelas_validas.filter(status='paga').count()
+        
+        if pagas == 0:
+            return 'aberta'
+        if pagas < total:
+            return 'parcial'
+        return 'quitada'
+        
+    def atualizar_status_financeiro(self):
+        novo_status = self.calcular_status_financeiro()
+        
+        if self.status_financeiro != novo_status:
+            type(self).objects.filter(pk=self.pk).update(
+                status_financeiro=novo_status
+            )
+            
     empresa = models.ForeignKey(
         'empresas.Empresa',
         on_delete=models.CASCADE,
@@ -365,7 +408,9 @@ class Venda(models.Model):
 
     orcamento = models.OneToOneField(
         'clientes.Orcamento',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='venda'
     )
 
@@ -524,7 +569,7 @@ class Venda(models.Model):
                 observacao=parcelas_payload[i].get('observacao') or '',
                 status='pendente'
             )
-
+        
     class Meta:
         ordering = ['-data']
 
