@@ -6,16 +6,17 @@
 
 {% if vendas %}
 <table class="table table-hover align-middle">
-    <thead>
-        <tr>
-            <th>#</th>
-            <th>Cliente</th>
-            <th>Data</th>
-            <th>Status</th>
-            <th class="text-end">Valor</th>
-            <th class="text-center">Ações</th>
-        </tr>
-    </thead>
+   <thead>
+  <tr>
+    <th>#</th>
+    <th>Cliente</th>
+    <th>Data</th>
+    <th class="text-center">Status</th>
+    <th class="text-end">Valor</th>
+    <th class="text-center">Ações</th>
+  </tr>
+</thead>
+
     <tbody>
         {% for venda in vendas %}
         <tr>
@@ -27,15 +28,13 @@
 
             <td>{{ venda.data|date:"d/m/Y" }}</td>
 
-            <td>
-                {% if venda.status == 'aberta' %}
-                <span class="badge bg-success">Aberta</span>
-                {% elif venda.status == 'faturada' %}
-                <span class="badge bg-primary">Faturada</span>
-                {% else %}
-                <span class="badge bg-secondary">Cancelada</span>
-                {% endif %}
-            </td>
+           <td>
+    <div class="d-flex justify-content-center align-items-center">
+       <span class="badge {{ venda.status_badge_class }} px-3 py-2">
+            {{ venda.get_status_financeiro_display }}
+        </span>
+    </div>
+</td>  
 
             <td class="text-end">
                 R$ {{ venda.valor_total|floatformat:2 }}

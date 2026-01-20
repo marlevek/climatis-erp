@@ -3,6 +3,8 @@ from django.db.models import Max
 from empresas.models import Empresa 
 from decimal import Decimal
 from datetime import timedelta
+from django.utils.timezone import now
+from collections import defaultdict
 import re 
 
 
@@ -355,6 +357,7 @@ class Venda(models.Model):
         ('aberta', 'Aberta'),
         ('parcial', 'Parcial'),
         ('quitada', 'Quitada'),
+        ('em_atraso', 'Em atraso'),
     )
     
     status_financeiro = models.CharField(
@@ -380,11 +383,16 @@ class Venda(models.Model):
         total = parcelas_validas.count()
         pagas = parcelas_validas.filter(status='paga').count()
         
-        if pagas == 0:
-            return 'aberta'
-        if pagas < total:
+        if pagas == total:
+           return 'quitada'
+       
+        if self.possui_parcelas_em_atraso():
+            return 'em_atraso'
+        
+        if pagas > 0:
             return 'parcial'
-        return 'quitada'
+        
+        return 'aberta'
         
     def atualizar_status_financeiro(self):
         novo_status = self.calcular_status_financeiro()
@@ -393,7 +401,14 @@ class Venda(models.Model):
             type(self).objects.filter(pk=self.pk).update(
                 status_financeiro=novo_status
             )
-            
+    
+    def possui_parcelas_em_atraso(self):
+        return self.parcelas.filter(
+            status = 'pendente',
+            data_vencimento__lt = now().date()
+        ).exists()
+        
+         
     empresa = models.ForeignKey(
         'empresas.Empresa',
         on_delete=models.CASCADE,
@@ -569,6 +584,15 @@ class Venda(models.Model):
                 observacao=parcelas_payload[i].get('observacao') or '',
                 status='pendente'
             )
+    
+    def status_badge_class(self):
+        return {
+            'aberta': 'bg-secondary',
+            'parcial': 'bg-warning',
+            'em_atraso': 'bg-danger',
+            'quitada': 'bg-success',
+        }.get(self.status_financeiro, 'bg-secondary')
+    
         
     class Meta:
         ordering = ['-data']
@@ -626,6 +650,68 @@ class Parcelamento(models.Model):
     observacao = models.CharField(max_length=255, blank=True, null=True)
     
     criado_em = models.DateTimeField(auto_now_add=True)
+    
+    def esta_atrasada(self):
+        '''
+        Retorna True se a parcela estiver pendente e vencida.
+        '''
+        if self.status != 'pendente':
+            return False
+        
+        if not self.data_vencimento:
+            return False
+
+        return self.data_vencimento < now().date()
+    
+    def dias_em_atraso(self):
+        if self.status != 'pendente':
+            return 0 
+        
+        if not self.data_vencimento:
+            return 0
+        
+        hoje = now().date()
+        
+        if self.data_vencimento >= hoje:
+            return 0
+        
+        return (hoje - self.data_vencimento).days
+    
+    def faixa_aging(self):
+        dias = self.dias_em_atraso()
+        
+        if dias == 0:
+            return None 
+        
+        if dias <= 30:
+            return '0 - 30'
+        elif dias <= 60:
+            return '31 - 60'
+        elif dias <= 90:
+            return '61 - 90'
+        else:
+            return '90+'
+    
+    def aging_list():
+        resultado = defaultdict(lambda: {
+            'quantidade': 0,
+            'valor_total': 0
+        })
+        
+        parcelas = Parcelamento.objects.filter(
+            status = 'pendente',
+            data_vencimento__lt = now().date()
+        )
+        
+        for parcela in parcelas:
+            faixa = parcela.faixa_aging()
+            if not faixa:
+                continue
+            
+            resultado[faixa]['quantidade'] += 1
+            resultado[faixa]['valor_total'] += parcela.valor
+            
+        return resultado
     
     class Meta:
         ordering = ['data_vencimento']
