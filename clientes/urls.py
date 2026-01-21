@@ -16,9 +16,8 @@ from .views import (
     OrcamentoItemDeleteView,
     VendaListView,
     VendaDetailView,
-
 )
-
+from clientes.views_relatorios import relatorio_inadimplencia
 from clientes.views import gerar_codigo_servico
 
 
@@ -50,5 +49,8 @@ urlpatterns = [
     # Vendas
     path('vendas/', VendaListView.as_view(), name='venda_list'),
     path('vendas/<int:pk>/', VendaDetailView.as_view(), name='venda_detail'),
+
+    # Relatório Inadimplência
+    path('relatorios/inadimplencia/',relatorio_inadimplencia,  name='relatorio_inadimplencia'),
 
 ]
