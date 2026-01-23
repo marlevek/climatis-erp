@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+
+    <!-- TÍTULO -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">Dashboard Financeiro</h4>
+    </div>
+    <div class="mb-3">
+        <a href="{% url 'clientes:exportar_dashboard_excel' %}?mes={{ mes_selecionado }}&ano={{ ano_selecionado }}"
+            class="btn btn-outline-success btn-sm">
+            Exportar Excel
+        </a>
+        <a href="{% url 'clientes:exportar_dashboard_pdf' %}?mes={{ mes_selecionado }}&ano={{ ano_selecionado }}"
+            class="btn btn-outline-danger btn-sm">
+            Exportar PDF
+        </a>
+
+    </div>
+
+
+    <!-- CARDS FINANCEIROS -->
+    <div class="row">
+
+        <!-- TOTAL FATURADO -->
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Faturado</h6>
+                    <h4 class="fw-bold text-success">
+                        R$ {{ comp_faturado.atual|floatformat:2|intcomma }}
+                    </h4>
+
+                    {% if comp_faturado.variacao != None %}
+                    <small class="{% if comp_faturado.variacao >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {% if comp_faturado.variacao >= 0 %}▲{% else %}▼{% endif %}
+                        {{ comp_faturado.variacao }}%
+                        vs mês anterior
+                    </small>
+                    {% else %}
+                    <small class="text-muted">Sem comparativo</small>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+
+        <!-- TOTAL A RECEBER -->
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h6 class="text-muted">Total a Receber</h6>
+                    <h4 class="fw-bold text-primary">
+                        R$ {{ total_a_receber|floatformat:2|intcomma }}
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOTAL EM ATRASO -->
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h6 class="text-muted">Total em Atraso</h6>
+                    <h4 class="fw-bold text-danger">
+                        R$ {{ total_em_atraso|floatformat:2|intcomma }}
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- VENDAS EM ATRASO -->
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h6 class="text-muted">Vendas em Atraso</h6>
+                    <h4 class="fw-bold">
+                        {{ qtd_vendas_em_atraso }}
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- AGING DA INADIMPLÊNCIA -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="mb-3">Aging da Inadimplência</h5>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Faixa</th>
+                                    <th class="text-end">Qtd. Parcelas</th>
+                                    <th class="text-end">Valor Total (R$)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for faixa, dados in aging.items %}
+                                <tr>
+                                    <td> <a
+                                            href="{% url 'clientes:aging_detalhe' faixa %}?mes={{ mes_selecionado }}&ano={{ ano_selecionado }}">
+                                            {{ faixa }}
+                                        </a></td>
+                                    <td class="text-end">{{ dados.quantidade }}</td>
+                                    <td class="text-end">
+                                        R$ {{ dados.valor_total|floatformat:2|intcomma }}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">
+                                        Nenhum dado de inadimplência encontrado.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Placeholder para gráfico -->
+                    <div class="mt-4">
+                        <canvas id="graficoAging" height="100"></canvas>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const agingData = {
+        labels: [
+            {% for faixa, dados in aging.items %}
+    "{{ faixa }}",
+        {% endfor %}
+        ],
+    datasets: [{
+        label: 'Valor em atraso (R$)',
+        data: [
+            {% for faixa, dados in aging.items %}
+                    {{ dados.valor_total }},
+    {% endfor %}
+    ],
+        borderWidth: 1
+        }]
+    };
+
+    const configAging = {
+        type: 'bar',
+        data: agingData,
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            let value = context.raw || 0;
+                            return 'R$ ' + value.toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2
+                            });
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    ticks: {
+                        callback: function (value) {
+                            return 'R$ ' + value.toLocaleString('pt-BR');
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    new Chart(
+        document.getElementById('graficoAging'),
+        configAging
+    );
+</script>
+
+{% endblock %}

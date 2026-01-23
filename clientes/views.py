@@ -1,12 +1,14 @@
 from django.urls import reverse_lazy
 import json
+import pandas as pd
+from django.utils.timezone import now
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView, TemplateView
 from .models import Cliente
 from .forms import ClienteForm
 from clientes.models import Servico, Orcamento, OrcamentoItem, Venda, Parcelamento
-from django.contrib.auth.mixins import LoginRequiredMixin 
+from django.contrib.auth.mixins import LoginRequiredMixin
 from accounts.mixins import PerfilRequiredMixin
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views import View
 from enderecos.services.cnpj_service import buscar_cnpj
@@ -16,13 +18,27 @@ from datetime import timedelta, datetime
 from django.utils import timezone
 from django.db import models
 from django.db.models import Sum
-
+from django.shortcuts import render
+from empresas.models import Empresa
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from clientes.relatorios import (
+    total_em_atraso,
+    total_a_receber,
+    total_faturado,
+    qtd_vendas_em_atraso,
+    inadimplencia_por_aging,
+    indicador_comparativo,
+)
 
 
 # CLIENTES
 class ClienteQuerysetMixin(LoginRequiredMixin, PerfilRequiredMixin):
     login_url = '/admin/login/'
-    
+
     def get_queryset(self):
         return Cliente.objects.filter(
             empresa=self.request.user.perfil.empresa
@@ -58,11 +74,11 @@ class BuscarCNPJView(LoginRequiredMixin, PerfilRequiredMixin, View):
     def get(self, request):
         cnpj = request.GET.get('cnpj', '')
         dados = buscar_cnpj(cnpj)
-        
+
         if not dados:
             return JsonResponse(
-                {'success': False, 'erro': 'CNPJ inválido ou não encontrado'}, status = 200)
-        
+                {'success': False, 'erro': 'CNPJ inválido ou não encontrado'}, status=200)
+
         return JsonResponse({'success': True, 'data': dados}, status=200)
 
 
@@ -101,9 +117,9 @@ class ServicoUpdateView(LoginRequiredMixin, UpdateView):
     fields = ServicoCreateView.fields
     template_name = 'servicos/servico_form.html'
     success_url = '/clientes/servicos/'
-    
 
-#---------- ORÇAMENTOS ------------
+
+# ---------- ORÇAMENTOS ------------
 class OrcamentoDetailView(LoginRequiredMixin, DetailView):
     model = Orcamento
     template_name = 'orcamentos/orcamento_detail.html'
@@ -139,9 +155,12 @@ class OrcamentoDetailView(LoginRequiredMixin, DetailView):
         # SALVAR ORÇAMENTO (GERAL)
         # =========================
         elif acao == 'salvar_orcamento':
-            self.object.tipo_pagamento = request.POST.get('tipo_pagamento') or None
-            self.object.condicoes_pagamento = request.POST.get('condicoes_pagamento') or None
-            self.object.observacoes_pagamento = request.POST.get('observacoes_pagamento') or None
+            self.object.tipo_pagamento = request.POST.get(
+                'tipo_pagamento') or None
+            self.object.condicoes_pagamento = request.POST.get(
+                'condicoes_pagamento') or None
+            self.object.observacoes_pagamento = request.POST.get(
+                'observacoes_pagamento') or None
 
             self.object.status = 'rascunho'
             self.object.save()
@@ -157,7 +176,8 @@ class OrcamentoDetailView(LoginRequiredMixin, DetailView):
                 return redirect('clientes:orcamento_detail', pk=self.object.pk)
 
             quantidade = int(request.POST.get('quantidade', 1))
-            desconto_percentual = request.POST.get('desconto_percentual') or None
+            desconto_percentual = request.POST.get(
+                'desconto_percentual') or None
             desconto_valor = request.POST.get('desconto_valor') or None
             descricao = request.POST.get('descricao')
 
@@ -251,7 +271,7 @@ class OrcamentoCreateView(LoginRequiredMixin, CreateView):
         orcamento = form.save(commit=False)
         orcamento.empresa = self.request.user.perfil.empresa
         orcamento.save()
-        
+
         return redirect(
             'clientes:orcamento_detail',
             pk=orcamento.pk
@@ -316,35 +336,34 @@ class OrcamentoPrintView(LoginRequiredMixin, DetailView):
 
 ###### VENDAS ######
 class VendaListView(LoginRequiredMixin, ListView):
-    model = Venda 
+    model = Venda
     template_name = 'vendas/venda_list.html'
     context_object_name = 'vendas'
-    
+
     def get_queryset(self):
         return Venda.objects.filter(
-            empresa = self.request.user.perfil.empresa
+            empresa=self.request.user.perfil.empresa
         ).select_related('cliente', 'orcamento')
-
 
 
 class VendaDetailView(LoginRequiredMixin, DetailView):
     model = Venda
     template_name = 'vendas/venda_detail.html'
     context_object_name = 'venda'
-    
+
     def get_queryset(self):
         """Filtra apenas vendas da empresa do usuário"""
         return Venda.objects.filter(
             empresa=self.request.user.perfil.empresa
         ).select_related('cliente', 'orcamento')
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         venda = self.object
-        
+
         # Buscar parcelas
         parcelas = venda.parcelas.all().order_by('numero')
-        
+
         print(f'\n🔍 ===== GET CONTEXT DATA =====')
         print(f'🔍 Venda ID: {venda.id}')
         print(f'🔍 Tipo pagamento real: {venda.tipo_pagamento_real}')
@@ -352,7 +371,8 @@ class VendaDetailView(LoginRequiredMixin, DetailView):
         print(f'🔍 Total parcelas: {parcelas.count()}')
         if parcelas.exists():
             for p in parcelas:
-                print(f'   - Parcela #{p.numero}: R$ {p.valor} - {p.data_vencimento} - {p.forma_pagamento}')
+                print(
+                    f'   - Parcela #{p.numero}: R$ {p.valor} - {p.data_vencimento} - {p.forma_pagamento}')
         print(f'🔍 ==============================\n')
 
         context['parcelas'] = parcelas
@@ -364,33 +384,34 @@ class VendaDetailView(LoginRequiredMixin, DetailView):
         )
 
         return context
-    
+
     def post(self, request, *args, **kwargs):
         """Processa o salvamento do pagamento"""
         venda = self.get_object()
-        
+
         print(f'\n🔥 ===== POST RECEBIDO =====')
         print(f'🔥 Venda ID: {venda.id}')
-        
+
         parcelas_json = request.POST.get('parcelas_json', '').strip()
-        
+
         # Salvar dados principais
         venda.tipo_pagamento_real = request.POST.get('tipo_pagamento_real')
         venda.forma_pagamento = request.POST.get('forma_pagamento')
-        
+
         # 🔥 Salvar data_pagamento se existir
         data_pagamento = request.POST.get('data_pagamento')
         if data_pagamento:
             venda.data_pagamento = data_pagamento
-        
+
         # 🔥 Salvar valor_pagamento
         valor_pagamento = request.POST.get('valor_pagamento')
         if valor_pagamento:
             venda.valor_pagamento = Decimal(valor_pagamento)
-        
-        venda.observacoes_pagamento_real = request.POST.get('observacoes_pagamento')
+
+        venda.observacoes_pagamento_real = request.POST.get(
+            'observacoes_pagamento')
         venda.save()
-        
+
         print(f'🔥 Tipo pagamento: {venda.tipo_pagamento_real}')
         print(f'🔥 Forma pagamento: {venda.forma_pagamento}')
         print(f'🔥 Data pagamento: {venda.data_pagamento}')
@@ -398,8 +419,9 @@ class VendaDetailView(LoginRequiredMixin, DetailView):
 
         # Processar parcelas
         if parcelas_json:
-            print(f'🔥 JSON recebido (primeiros 200 chars): {parcelas_json[:200]}')
-            
+            print(
+                f'🔥 JSON recebido (primeiros 200 chars): {parcelas_json[:200]}')
+
             # Deletar parcelas antigas
             qtd_antigas = venda.parcelas.count()
             venda.parcelas.all().delete()
@@ -408,7 +430,7 @@ class VendaDetailView(LoginRequiredMixin, DetailView):
             try:
                 parcelas = json.loads(parcelas_json)
                 print(f'🔥 Criando {len(parcelas)} novas parcelas...')
-                
+
                 for p in parcelas:
                     parcela = Parcelamento.objects.create(
                         venda=venda,
@@ -419,20 +441,252 @@ class VendaDetailView(LoginRequiredMixin, DetailView):
                         observacao=p.get('observacao', ''),
                         status='pendente'
                     )
-                    print(f'   ✅ Parcela #{parcela.numero}: R$ {parcela.valor} - {parcela.data_vencimento} - {parcela.forma_pagamento}')
-                
+                    print(
+                        f'   ✅ Parcela #{parcela.numero}: R$ {parcela.valor} - {parcela.data_vencimento} - {parcela.forma_pagamento}')
+
                 # Confirmar salvamento
                 total_agora = venda.parcelas.count()
                 print(f'🔥 Total de parcelas salvas: {total_agora}')
-                
+
             except json.JSONDecodeError as e:
                 print(f'❌ ERRO ao parsear JSON: {e}')
             except Exception as e:
                 print(f'❌ ERRO ao criar parcelas: {e}')
         else:
             print(f'🔥 Nenhuma parcela enviada (JSON vazio)')
-        
+
         print(f'🔥 ==========================\n')
 
         # Redireciona de volta para a mesma página
         return redirect('clientes:venda_list')
+
+
+# FINANCEIRO
+@login_required
+def dashboard_financeiro_view(request):
+    mes = request.GET.get('mes')
+    ano = request.GET.get('ano')
+
+    mes = int(mes) if mes else None
+    ano = int(ano) if ano else None
+
+    context = {
+        "total_faturado": total_faturado(mes, ano),
+        "total_a_receber": total_a_receber(mes, ano),
+        "total_em_atraso": total_em_atraso(mes, ano),
+        "qtd_vendas_em_atraso": qtd_vendas_em_atraso(mes, ano),
+        "aging": inadimplencia_por_aging(mes, ano),
+
+        # indicadores comparativos
+        "comp_faturado": indicador_comparativo(total_faturado, mes, ano),
+        "comp_em_atraso": indicador_comparativo(total_em_atraso, mes, ano),
+
+        "mes_selecionado": mes,
+        "ano_selecionado": ano,
+    }
+
+    return render(
+        request,
+        "clientes/dashboard_financeiro.html",
+        context
+    )
+
+
+@login_required
+def aging_detalhe_view(request, faixa):
+    """
+    Lista parcelas em atraso filtradas por faixa de aging.
+    Aceita mes/ano via GET para manter consistência com o dashboard.
+    """
+    mes_raw = request.GET.get("mes")
+    ano_raw = request.GET.get("ano")
+
+    mes = int(mes_raw) if mes_raw and mes_raw != 'None' else None
+    ano = int(ano_raw) if ano_raw and ano_raw != 'None' else None
+
+    parcelas = Parcelamento.objects.filter(
+        status="pendente",
+        data_vencimento__lt=now().date()
+    )
+
+    if mes:
+        parcelas = parcelas.filter(data_vencimento__month=mes)
+    if ano:
+        parcelas = parcelas.filter(data_vencimento__year=ano)
+
+    # filtra pela faixa usando a regra do model
+    parcelas = [
+        p for p in parcelas
+        if p.faixa_aging() == faixa
+    ]
+
+    context = {
+        "faixa": faixa,
+        "parcelas": parcelas,
+        "mes": mes,
+        "ano": ano,
+    }
+
+    return render(
+        request,
+        "clientes/aging_detalhe.html",
+        context
+    )
+
+
+# EXPORTAR DASHBOARD
+@login_required
+def exportar_dashboard_excel(request):
+    mes_raw = request.GET.get("mes")
+    ano_raw = request.GET.get("ano")
+
+    mes = int(mes_raw) if mes_raw and mes_raw != "None" else None
+    ano = int(ano_raw) if ano_raw and ano_raw != "None" else None
+
+    # ---------- Indicadores ----------
+    indicadores = {
+        "Total Faturado": round(float(total_faturado(mes, ano)), 2),
+        "Total a Receber": round(float(total_a_receber(mes, ano)), 2),
+        "Total em Atraso": round(float(total_em_atraso(mes, ano)), 2),
+        "Qtd. Vendas em Atraso": qtd_vendas_em_atraso(mes, ano),
+    }
+
+    df_indicadores = pd.DataFrame(
+        list(indicadores.items()),
+        columns=["Indicador", "Valor"]
+    )
+
+    # ---------- Aging ----------
+    aging = inadimplencia_por_aging(mes, ano)
+    df_aging = pd.DataFrame([
+        {
+            "Faixa": faixa,
+            "Quantidade": dados["quantidade"],
+            "Valor Total": dados["valor_total"]
+        }
+        for faixa, dados in aging.items()
+    ])
+
+    # ---------- Resposta ----------
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="dashboard_financeiro.xlsx"'
+
+    with pd.ExcelWriter(response, engine="openpyxl") as writer:
+
+        df_indicadores.to_excel(writer, sheet_name="Indicadores", index=False)
+        df_aging.to_excel(writer, sheet_name="Aging", index=False)
+
+        workbook = writer.book
+
+        # ---------- Indicadores ----------
+        ws_ind = writer.sheets["Indicadores"]
+
+        for row in range(2, ws_ind.max_row + 1):
+            if ws_ind.cell(row=row, column=1).value != "Qtd. Vendas em Atraso":
+                ws_ind.cell(row=row, column=2).number_format = 'R$ #,##0.00'
+
+        ws_ind.column_dimensions["A"].width = 30
+        ws_ind.column_dimensions["B"].width = 20
+
+        # ---------- Aging ----------
+        ws_aging = writer.sheets["Aging"]
+        ws_aging.column_dimensions["A"].width = 15
+        ws_aging.column_dimensions["B"].width = 15
+        ws_aging.column_dimensions["C"].width = 20
+
+        for row in range(2, ws_aging.max_row + 1):
+            ws_aging.cell(row=row, column=3).number_format = 'R$ #,##0.00'
+
+    return response
+
+
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# Exportar PDF
+@login_required
+def exportar_dashboard_pdf(request):
+   
+    text_styles = getSampleStyleSheet()
+
+    empresa = Empresa.objects.first()
+    nome_empresa = empresa.nome if empresa else 'Nome da sua Empresa'
+    logo_path = None
+    if empresa and hasattr(empresa, 'logo') and empresa.logo:
+        logo_path = empresa.logo.path
+    
+    mes_raw = request.GET.get("mes")
+    ano_raw = request.GET.get("ano")
+
+    mes = int(mes_raw) if mes_raw and mes_raw != "None" else None
+    ano = int(ano_raw) if ano_raw and ano_raw != "None" else None
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = 'attachment; filename="dashboard_financeiro.pdf"'
+
+    doc = SimpleDocTemplate(response, pagesize=A4)
+    
+    elements = []
+    
+    if logo_path:
+        elements.append(
+            Image(
+                logo_path,
+                width=4 * cm,
+                height=2 * cm,
+                hAlign='LEFT'
+            )
+        )
+    elements.append(Paragraph(nome_empresa, text_styles['Title']))
+    elements.append(Spacer(1, 12))
+
+    # -------- TÍTULO --------
+    elements.append(Paragraph("Dashboard Financeiro", text_styles["Title"]))
+    elements.append(Spacer(1, 12))
+
+    # -------- INDICADORES --------
+    indicadores = [
+        ["Indicador", "Valor (R$)"],
+        ["Total Faturado", f"{total_faturado(mes, ano):,.2f}"],
+        ["Total a Receber", f"{total_a_receber(mes, ano):,.2f}"],
+        ["Total em Atraso", f"{total_em_atraso(mes, ano):,.2f}"],
+        ["Qtd. Vendas em Atraso", qtd_vendas_em_atraso(mes, ano)],
+    ]
+
+    tabela_ind = Table(indicadores, colWidths=[250, 150])
+    tabela_ind.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+        ("ALIGN", (1,1), (-1,-1), "RIGHT"),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+    ]))
+
+    elements.append(tabela_ind)
+    elements.append(Spacer(1, 20))
+
+    # -------- AGING --------
+    elements.append(Paragraph("Aging da Inadimplência", text_styles["Heading2"]))
+    elements.append(Spacer(1, 10))
+
+    aging_data = [["Faixa", "Qtd Parcelas", "Valor Total (R$)"]]
+    aging = inadimplencia_por_aging(mes, ano)
+
+    for faixa, dados in aging.items():
+        aging_data.append([
+            faixa,
+            dados["quantidade"],
+            f"{dados['valor_total']:,.2f}"
+        ])
+
+    tabela_aging = Table(aging_data, colWidths=[150, 150, 150])
+    tabela_aging.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+        ("ALIGN", (1,1), (-1,-1), "RIGHT"),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+    ]))
+
+    elements.append(tabela_aging)
+
+    doc.build(elements)
+    return response

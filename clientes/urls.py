@@ -18,7 +18,7 @@ from .views import (
     VendaDetailView,
 )
 from clientes.views_relatorios import relatorio_inadimplencia
-from clientes.views import gerar_codigo_servico
+from clientes.views import gerar_codigo_servico, dashboard_financeiro_view, aging_detalhe_view,  exportar_dashboard_excel, exportar_dashboard_pdf
 
 
 app_name = 'clientes'
@@ -52,5 +52,12 @@ urlpatterns = [
 
     # Relatório Inadimplência
     path('relatorios/inadimplencia/',relatorio_inadimplencia,  name='relatorio_inadimplencia'),
+    
+    # Financeirio
+    path("dashboard/financeiro/",dashboard_financeiro_view,        name="dashboard_financeiro"),
+    path("dashboard/financeiro/aging/<str:faixa>/",
+        aging_detalhe_view, name="aging_detalhe"),
+    path('dashboard/financeiro/exportar/excel', exportar_dashboard_excel, name='exportar_dashboard_excel'),
+    path('dashboard/financeiro/exportar/pdf', exportar_dashboard_pdf, name='exportar_dashboard_pdf'),
 
 ]
