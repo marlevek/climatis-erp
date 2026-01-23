@@ -618,6 +618,18 @@ class Parcelamento(models.Model):
         ('cancelada', 'Cancelada'),
     )
     
+    STATUS_COBRANCA_CHOICES = (
+        ('nao_enviado', 'Não enviado'),
+        ('enviado', 'Enviado'),
+        ('negociacao', 'Em negociação'),
+    )
+    status_cobranca = models.CharField(
+        max_length=20,
+        choices=STATUS_COBRANCA_CHOICES,
+        default='nao_enviado',
+        blank=True
+    )
+    
     venda = models.ForeignKey(
         'clientes.Venda',
         on_delete=models.CASCADE,

@@ -2,6 +2,7 @@ from django.urls import reverse_lazy
 import json
 import pandas as pd
 from django.utils.timezone import now
+from django.utils.http import urlencode
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView, TemplateView
 from .models import Cliente
 from .forms import ClienteForm
@@ -515,23 +516,63 @@ def aging_detalhe_view(request, faixa):
         parcelas = parcelas.filter(data_vencimento__year=ano)
 
     # filtra pela faixa usando a regra do model
-    parcelas = [
-        p for p in parcelas
-        if p.faixa_aging() == faixa
-    ]
+    parcelas_filtradas = []
 
+    for p in parcelas:
+        if p.faixa_aging() == faixa:
+            p.mensagem_whatsapp = (
+                f"Olá {p.venda.cliente.nome}, "
+                f"identificamos uma parcela em aberto no valor de R$ {p.valor:.2f} "
+                f"com vencimento em {p.data_vencimento.strftime('%d/%m/%Y')}. "
+                f"Podemos regularizar?"
+            )
+            parcelas_filtradas.append(p)
+
+    parcelas = parcelas_filtradas
+
+    # temporário para whatsapp
+    telefone_cobranca = '41996131762'
+    
     context = {
-        "faixa": faixa,
-        "parcelas": parcelas,
-        "mes": mes,
-        "ano": ano,
-    }
+    "faixa": faixa,
+    "parcelas": parcelas,
+    "mes": mes,
+    "ano": ano,
+    'telefone_cobranca': telefone_cobranca,        
+}
 
     return render(
         request,
         "clientes/aging_detalhe.html",
         context
     )
+
+from django.shortcuts import get_object_or_404, redirect
+from django.utils.http import urlencode
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def cobrar_parcela_whatsapp(request, parcela_id):
+    parcela = get_object_or_404(Parcelamento, id=parcela_id)
+
+    # marca automaticamente como enviado
+    if parcela.status_cobranca != "enviado":
+        parcela.status_cobranca = "enviado"
+        parcela.save(update_fields=["status_cobranca"])
+
+    telefone = request.GET.get("telefone")
+
+    # monta a mensagem AQUI (sempre disponível)
+    mensagem = (
+        f"Olá {parcela.venda.cliente}, "
+        f"identificamos uma parcela em aberto no valor de R$ {parcela.valor:.2f} "
+        f"com vencimento em {parcela.data_vencimento.strftime('%d/%m/%Y')}. "
+        f"Podemos regularizar?"
+    )
+
+    params = urlencode({"text": mensagem})
+
+    return redirect(f"https://wa.me/55{telefone}?{params}")
 
 
 # EXPORTAR DASHBOARD
