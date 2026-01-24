@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load l10n %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Lançamentos Financeiros</h4>
+        <a href="{% url 'clientes:novo_lancamento_financeiro' %}" class="btn btn-success btn-sm">
+            + Novo Lançamento
+        </a>
+    </div>
+
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Descrição</th>
+                <th>Tipo</th>
+                <th class="text-end">Valor</th>
+                <th class="text-end">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for l in lancamentos %}
+            <tr>
+                <td>{{ l.data|date:"d/m/Y" }}</td>
+                <td>{{ l.descricao }}</td>
+                <td>
+                    {% if l.tipo == 'entrada' %}
+                        <span class="badge bg-success">Entrada</span>
+                    {% else %}
+                        <span class="badge bg-danger">Saída</span>
+                    {% endif %}
+                </td>
+                <td class="text-end">
+                    R$ {{ l.valor|floatformat:2|localize }}
+                </td>
+                <td class="text-end">
+                    <a href="{% url 'clientes:editar_lancamento_financeiro' l.id %}"
+                       class="btn btn-outline-primary btn-sm">
+                        Editar
+                    </a>
+                    <a href="{% url 'clientes:excluir_lancamento_financeiro' l.id %}"
+                       class="btn btn-outline-danger btn-sm"
+                       onclick="return confirm('Deseja excluir este lançamento?');">
+                        Excluir
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="text-center text-muted">
+                    Nenhum lançamento encontrado para este período.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</div>
+{% endblock %}
