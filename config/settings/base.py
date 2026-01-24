@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
     'clientes.apps.ClientesConfig',
     'enderecos',
+    'financeiro',
 
 ]
 
