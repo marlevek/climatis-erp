@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h4 class="mb-4">Novo Lançamento Financeiro</h4>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            {{ form.tipo.label_tag }}
+            {{ form.tipo }}
+        </div>
+
+        <div class="mb-3">
+            {{ form.data.label_tag }}
+            {{ form.data }}
+        </div>
+
+        <div class="mb-3">
+            {{ form.descricao.label_tag }}
+            {{ form.descricao }}
+        </div>
+
+        <div class="mb-3">
+            {{ form.valor.label_tag }}
+            {{ form.valor }}
+        </div>
+
+        <button type="submit" class="btn btn-success">
+            Salvar Lançamento
+        </button>
+
+        <a href="{% url 'clientes:dashboard_financeiro' %}" class="btn btn-secondary">
+            Cancelar
+        </a>
+    </form>
+</div>
+{% endblock %}

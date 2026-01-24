@@ -19,6 +19,7 @@ from .views import (
 )
 from clientes.views_relatorios import relatorio_inadimplencia
 from clientes.views import gerar_codigo_servico, dashboard_financeiro_view, aging_detalhe_view,  exportar_dashboard_excel, exportar_dashboard_pdf, cobrar_parcela_whatsapp
+from financeiro.views import novo_lancamento_financeiro
 
 
 app_name = 'clientes'
@@ -53,7 +54,7 @@ urlpatterns = [
     # Relatório Inadimplência
     path('relatorios/inadimplencia/',relatorio_inadimplencia,  name='relatorio_inadimplencia'),
     
-    # Financeirio
+    # Financeiro
     path("dashboard/financeiro/",dashboard_financeiro_view,        name="dashboard_financeiro"),
     path("dashboard/financeiro/aging/<str:faixa>/",
         aging_detalhe_view, name="aging_detalhe"),
@@ -62,8 +63,9 @@ urlpatterns = [
     path(
     "parcelamento/<int:parcela_id>/whatsapp/",
     cobrar_parcela_whatsapp,
-    name="cobrar_parcela_whatsapp"
-),
+    name="cobrar_parcela_whatsapp"),
+
+    path('financeiro/novo/', novo_lancamento_financeiro, name='novo_lancamento_financeiro'),
 
 
 ]

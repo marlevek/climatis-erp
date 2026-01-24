@@ -10,6 +10,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         BASE_DIR = Path(__file__).resolve().parents[3]
         caminho_arquivo = BASE_DIR / "importacoes" / "relatorio_contas_receber.xlsx"
+        VALOR_COL = 'Unnamed: 14'
+        DATA_VENC_COL = 'Unnamed: 9'
+        DATA_PAG_COL = 'Unnamed: 10'
 
         self.stdout.write("Lendo arquivo Excel...")
         df = pd.read_excel(caminho_arquivo)
@@ -18,7 +21,7 @@ class Command(BaseCommand):
         # NORMALIZA VALOR (FORMATO BR)
         # --------------------------------
         df["valor_normalizado"] = (
-            df["Unnamed: 16"]
+            df[VALOR_COL]
             .astype(str)
             .str.replace("R$", "", regex=False)
             .str.replace(".", "", regex=False)
@@ -29,6 +32,9 @@ class Command(BaseCommand):
         df["valor_normalizado"] = pd.to_numeric(
             df["valor_normalizado"], errors="coerce"
         )
+
+        df = df[df["valor_normalizado"].notna() & (df["valor_normalizado"] > 0)]
+
 
         # mantém apenas linhas com valor válido
         df = df[df["valor_normalizado"].notna()]
@@ -53,10 +59,13 @@ class Command(BaseCommand):
             if documento:
                 descricao += f" ({documento})"
 
+            descricao = str(row.get('Unnamed: 3', '')).strip()
+            descricao_final = descricao if descricao else 'Conta a receber importada'
+            
             LancamentoFinanceiro.objects.create(
                 tipo="entrada",
                 data=data,
-                descricao=descricao,
+                descricao=descricao_final,
                 valor=valor,
                 origem="GestãoClick",
             )

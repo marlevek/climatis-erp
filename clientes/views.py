@@ -1,3 +1,5 @@
+from django.shortcuts import get_object_or_404, redirect
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from django.urls import reverse_lazy
 import json
 import pandas as pd
@@ -34,6 +36,8 @@ from clientes.relatorios import (
     inadimplencia_por_aging,
     indicador_comparativo,
 )
+
+from clientes.relatorios import financeiro_mes, calcular_mes_anterior
 
 
 # CLIENTES
@@ -471,15 +475,25 @@ def dashboard_financeiro_view(request):
     mes = int(mes) if mes else None
     ano = int(ano) if ano else None
 
+    dados_financeiros = financeiro_mes(mes, ano)
+
     context = {
-        "total_faturado": total_faturado(mes, ano),
+        "total_faturado": dados_financeiros['total_faturado'],
+        "total_saidas": dados_financeiros['saidas'],
+        "saldo_mes": dados_financeiros['saldo'],
         "total_a_receber": total_a_receber(mes, ano),
         "total_em_atraso": total_em_atraso(mes, ano),
         "qtd_vendas_em_atraso": qtd_vendas_em_atraso(mes, ano),
         "aging": inadimplencia_por_aging(mes, ano),
 
-        # indicadores comparativos
-        "comp_faturado": indicador_comparativo(total_faturado, mes, ano),
+        "comp_faturado": {
+            "atual": dados_financeiros["total_faturado"],
+            "anterior": financeiro_mes(
+                *calcular_mes_anterior(mes, ano)
+            )["total_faturado"] if calcular_mes_anterior(mes, ano)[0] else None,
+            "variacao": None
+        },
+
         "comp_em_atraso": indicador_comparativo(total_em_atraso, mes, ano),
 
         "mes_selecionado": mes,
@@ -532,14 +546,14 @@ def aging_detalhe_view(request, faixa):
 
     # temporário para whatsapp
     telefone_cobranca = '41996131762'
-    
+
     context = {
-    "faixa": faixa,
-    "parcelas": parcelas,
-    "mes": mes,
-    "ano": ano,
-    'telefone_cobranca': telefone_cobranca,        
-}
+        "faixa": faixa,
+        "parcelas": parcelas,
+        "mes": mes,
+        "ano": ano,
+        'telefone_cobranca': telefone_cobranca,
+    }
 
     return render(
         request,
@@ -547,9 +561,6 @@ def aging_detalhe_view(request, faixa):
         context
     )
 
-from django.shortcuts import get_object_or_404, redirect
-from django.utils.http import urlencode
-from django.contrib.auth.decorators import login_required
 
 @login_required
 def cobrar_parcela_whatsapp(request, parcela_id):
@@ -643,11 +654,12 @@ def exportar_dashboard_excel(request):
     return response
 
 
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 # Exportar PDF
+
+
 @login_required
 def exportar_dashboard_pdf(request):
-   
+
     text_styles = getSampleStyleSheet()
 
     empresa = Empresa.objects.first()
@@ -655,7 +667,7 @@ def exportar_dashboard_pdf(request):
     logo_path = None
     if empresa and hasattr(empresa, 'logo') and empresa.logo:
         logo_path = empresa.logo.path
-    
+
     mes_raw = request.GET.get("mes")
     ano_raw = request.GET.get("ano")
 
@@ -666,9 +678,9 @@ def exportar_dashboard_pdf(request):
     response["Content-Disposition"] = 'attachment; filename="dashboard_financeiro.pdf"'
 
     doc = SimpleDocTemplate(response, pagesize=A4)
-    
+
     elements = []
-    
+
     if logo_path:
         elements.append(
             Image(
@@ -696,17 +708,18 @@ def exportar_dashboard_pdf(request):
 
     tabela_ind = Table(indicadores, colWidths=[250, 150])
     tabela_ind.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
-        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-        ("ALIGN", (1,1), (-1,-1), "RIGHT"),
-        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
     ]))
 
     elements.append(tabela_ind)
     elements.append(Spacer(1, 20))
 
     # -------- AGING --------
-    elements.append(Paragraph("Aging da Inadimplência", text_styles["Heading2"]))
+    elements.append(
+        Paragraph("Aging da Inadimplência", text_styles["Heading2"]))
     elements.append(Spacer(1, 10))
 
     aging_data = [["Faixa", "Qtd Parcelas", "Valor Total (R$)"]]
@@ -721,10 +734,10 @@ def exportar_dashboard_pdf(request):
 
     tabela_aging = Table(aging_data, colWidths=[150, 150, 150])
     tabela_aging.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
-        ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-        ("ALIGN", (1,1), (-1,-1), "RIGHT"),
-        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
     ]))
 
     elements.append(tabela_aging)

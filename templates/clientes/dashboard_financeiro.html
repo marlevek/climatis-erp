@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize l10n %}
 
 {% block content %}
 <div class="container-fluid mt-4">
@@ -30,7 +30,7 @@
                 <div class="card-body">
                     <h6 class="text-muted">Total Faturado</h6>
                     <h4 class="fw-bold text-success">
-                        R$ {{ comp_faturado.atual|floatformat:2|intcomma }}
+                       R$ {{ comp_faturado.atual|floatformat:2|localize }}
                     </h4>
 
                     {% if comp_faturado.variacao != None %}
@@ -47,14 +47,28 @@
             </div>
         </div>
 
-        <!-- TOTAL A RECEBER -->
+
         <div class="col-md-3 mb-3">
             <div class="card shadow-sm border-0">
                 <div class="card-body">
-                    <h6 class="text-muted">Total a Receber</h6>
-                    <h4 class="fw-bold text-primary">
-                        R$ {{ total_a_receber|floatformat:2|intcomma }}
+                    <h6 class="text-muted">Total de Saídas</h6>
+                    <h4 class="fw-bold text-danger">
+                       R$ {{ total_saidas|floatformat:2|localize }}
                     </h4>
+                    <small class="text-muted">Contas a pagar do mês</small>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h6 class="text-muted">Saldo do Mês</h6>
+                    <h4 class="fw-bold {% if saldo_mes >= 0 %}text-success{% else %}text-danger{% endif %}">
+                      R$ {{ saldo_mes|floatformat:2|localize }}
+                    </h4>
+                    <small class="text-muted">Entradas − Saídas</small>
                 </div>
             </div>
         </div>
@@ -65,7 +79,7 @@
                 <div class="card-body">
                     <h6 class="text-muted">Total em Atraso</h6>
                     <h4 class="fw-bold text-danger">
-                        R$ {{ total_em_atraso|floatformat:2|intcomma }}
+                       R$ {{ total_em_atraso|floatformat:2|localize }}
                     </h4>
                 </div>
             </div>
@@ -76,12 +90,13 @@
             <div class="card shadow-sm border-0">
                 <div class="card-body">
                     <h6 class="text-muted">Vendas em Atraso</h6>
-                    <h4 class="fw-bold">
+                    <h4 class="fw-bold text-danger">
                         {{ qtd_vendas_em_atraso }}
                     </h4>
                 </div>
             </div>
         </div>
+
 
     </div>
 

@@ -172,3 +172,70 @@ def indicador_comparativo(funcao_total, mes, ano):
         "anterior": valor_anterior,
         "variacao": round(variacao, 2)
     }
+
+
+# ===============================
+# FINANCEIRO REAL (Lancamentos)
+# ===============================
+from financeiro.models import LancamentoFinanceiro
+
+def financeiro_mes(mes=None, ano=None, incluir_ficticio=True):
+    """
+    Consolida entradas/saídas do mês a partir de LancamentoFinanceiro (import GestãoClick),
+    mantendo compatibilidade com o dashboard atual.
+
+    Observação:
+    - LancamentoFinanceiro NÃO possui data_vencimento nem status.
+    - Portanto, 'a_receber' e 'em_atraso' não podem ser calculados só com ele.
+    - Inadimplência/aging continua vindo do módulo de Parcelamento (funções existentes).
+    """
+
+    hoje = now().date()
+
+    if not mes:
+        mes = hoje.month
+    if not ano:
+        ano = hoje.year
+
+    qs = LancamentoFinanceiro.objects.filter(
+        data__month=mes,
+        data__year=ano,
+    )
+
+    total_entradas = (
+        qs.filter(tipo='entrada')
+        .aggregate(total=Sum('valor'))['total'] or 0
+    )
+
+    total_saidas = (
+        qs.filter(tipo='saida')
+        .aggregate(total=Sum('valor'))['total'] or 0
+    )
+
+    # Compatibilidade com o dashboard atual (mantém em 0 por enquanto)
+    total_a_receber = 0
+    total_em_atraso = 0
+    qtd_vendas_em_atraso = 0
+    aging = {}
+
+    if incluir_ficticio:
+        # Se você tiver valores fictícios a somar aqui, podemos fazer depois,
+        # sem mexer em view/template.
+        pass
+
+    return {
+        "mes": mes,
+        "ano": ano,
+
+        # Nomes usados no dashboard
+        "total_faturado": total_entradas,
+        "total_a_receber": total_a_receber,
+        "total_em_atraso": total_em_atraso,
+        "qtd_vendas_em_atraso": qtd_vendas_em_atraso,
+        "aging": aging,
+
+        # Extras úteis
+        "entradas": total_entradas,
+        "saidas": total_saidas,
+        "saldo": total_entradas - total_saidas,
+    }
