@@ -1,5 +1,8 @@
 from django import forms 
 from .models import Cliente 
+from clientes.models import OrcamentoItem
+from core.forms.fields import MoneyField
+
 
 
 class ClienteForm(forms.ModelForm):
@@ -36,3 +39,22 @@ class ClienteForm(forms.ModelForm):
                 'Nome fantasia é obrigatório pra Pessoa Jurídica'
             )
         return cleaned_data
+
+
+class OrcamentoItemForm(forms.ModelForm):
+    class Meta:
+        model = OrcamentoItem
+        fields = [
+            'quantidade',
+            'valor_unitario',
+            'desconto_percentual',
+            'desconto_valor',
+            'descricao',
+        ]
+        widgets = {
+            'descricao': forms.TextInput(attrs={'placeholder': ''}),
+        }
+
+
+class PagamentoRealForm(forms.Form):
+    valor_pagamento = MoneyField(required=False)

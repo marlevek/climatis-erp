@@ -4,9 +4,18 @@ from empresas.models import Empresa
 from decimal import Decimal
 from datetime import timedelta
 from django.utils.timezone import now
+from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 from collections import defaultdict
+from django.core.exceptions import ValidationError
+from core.utils.money import quantize_money
 import re 
 
+
+def clean(self):
+    super().clean()
+    if self.valor is not None:
+        self.valor = quantize_money(self.valor)
+        
 
 class Cliente(models.Model):
     TIPO_PESSOA_CHOICES = (
@@ -233,17 +242,19 @@ class Orcamento(models.Model):
     class Meta:
         ordering = ['-data']
     
+    
     def __str__(self):
         return f'Orçamento #{self.id} - {self.cliente}'
     
+    
     def total_itens(self):
-        """
-        Soma dos subtotais dos itens (com desconto por item).
-        """
-        return sum(
-            (item.subtotal() for item in self.itens.all()),
-            Decimal('0.00')
-        )
+        total = Decimal('0.00')
+
+        for item in self.itens.all():
+            total += (item.valor_unitario or Decimal('0.00')) * (item.quantidade or 0)
+
+        return total
+        
         
     def valor_desconto_geral(self):
         """
@@ -251,22 +262,27 @@ class Orcamento(models.Model):
         """
         total = self.total_itens()
 
-        if not self.desconto_tipo or self.desconto_valor <= 0:
+        if not self.desconto_valor or self.desconto_valor <= 0:
             return Decimal('0.00')
 
         if self.desconto_tipo == 'percentual':
-            return (total * self.desconto_valor) / Decimal('100')
+            return (total * self.desconto_valor / Decimal('100')).quantize(Decimal('0.01'))
 
         return min(self.desconto_valor, total)
+
 
     def total_com_desconto(self):
         """
         Total final do orçamento (itens - desconto geral).
         """
+        total = self.total_itens()
+        desconto = self.valor_desconto_geral()
+
         return max(
-            self.total_itens() - self.valor_desconto_geral(),
+            (total - desconto).quantize(Decimal('0.01')),
             Decimal('0.00')
-        )      
+        )
+
         
     def total(self):
         """
@@ -290,7 +306,7 @@ class OrcamentoItem(models.Model):
     descricao = models.CharField(
         max_length=255,
         blank=True,
-        null=True,
+        default='',
         help_text='Detalhes do serviço (ex: Limpeza de 4 splits)'
     )
 
@@ -335,6 +351,10 @@ class OrcamentoItem(models.Model):
 
     def subtotal(self):
         return self.subtotal_bruto() - self.valor_desconto()
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.orcamento.save()
 
     def __str__(self):
         return f'{self.servico} ({self.quantidade}x)'
@@ -603,11 +623,17 @@ class Venda(models.Model):
     
     criado_em = models.DateTimeField(auto_now_add=True)
     
-    class Meta:
-        ordering = ['-data']
-        
+            
     def __str__(self):
         return f'Venda #{self.id} - {self.cliente}'
+    
+    
+    def save(self, *args, **kwargs):
+        # 🔒 Fonte única da verdade: Orçamento aprovado
+        if self.orcamento and self.valor_total <= Decimal('0.00'):
+            self.valor_total = self.orcamento.total_com_desconto()
+        super().save(*args, **kwargs)
+
     
 
 # Parcelamento venda

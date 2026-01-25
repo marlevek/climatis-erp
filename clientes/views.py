@@ -7,7 +7,7 @@ from django.utils.timezone import now
 from django.utils.http import urlencode
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView, TemplateView
 from .models import Cliente
-from .forms import ClienteForm
+from .forms import ClienteForm, OrcamentoItemForm
 from clientes.models import Servico, Orcamento, OrcamentoItem, Venda, Parcelamento
 from django.contrib.auth.mixins import LoginRequiredMixin
 from accounts.mixins import PerfilRequiredMixin
@@ -38,7 +38,9 @@ from clientes.relatorios import (
 )
 
 from clientes.relatorios import financeiro_mes, calcular_mes_anterior
-
+from financeiro.models import LancamentoFinanceiro
+from django.utils.timezone import now
+from core.utils.money import parse_money, quantize_money
 
 # CLIENTES
 class ClienteQuerysetMixin(LoginRequiredMixin, PerfilRequiredMixin):
@@ -248,21 +250,31 @@ class OrcamentoListView(LoginRequiredMixin, ListView):
             orcamento.save()
 
             # =========================
-            # SE APROVADO → GERAR VENDA
+            # SE APROVADO → GERAR / GARANTIR VENDA
             # =========================
             if novo_status == 'aprovado':
-                if not hasattr(orcamento, 'venda'):
-                    Venda.objects.create(
-                        empresa=orcamento.empresa,
-                        cliente=orcamento.cliente,
-                        orcamento=orcamento,
-                        valor_total=orcamento.total_com_desconto(),
 
-                        # copia proposta de pagamento
-                        tipo_pagamento=orcamento.tipo_pagamento,
-                        condicoes_pagamento=orcamento.condicoes_pagamento,
-                        observacoes_pagamento=orcamento.observacoes_pagamento,
-                    )
+                venda, criada = Venda.objects.get_or_create(
+                    orcamento=orcamento,
+                    defaults={
+                        "empresa": orcamento.empresa,
+                        "cliente": orcamento.cliente,
+                        "valor_total": orcamento.total_com_desconto(),
+
+                        # snapshot da proposta
+                        "tipo_pagamento": orcamento.tipo_pagamento,
+                        "condicoes_pagamento": orcamento.condicoes_pagamento,
+                        "observacoes_pagamento": orcamento.observacoes_pagamento,
+                    }
+                )
+
+                # 🔒 BLINDAGEM FINAL (ESSENCIAL)
+                valor_correto = orcamento.total_com_desconto()
+
+                if venda.valor_total != valor_correto:
+                    venda.valor_total = valor_correto
+                    venda.save()
+
 
         return redirect('clientes:orcamento_list')
 
@@ -308,14 +320,8 @@ class OrcamentoItemDeleteView(LoginRequiredMixin, DeleteView):
 
 class OrcamentoItemUpdateView(LoginRequiredMixin, UpdateView):
     model = OrcamentoItem
+    form_class = OrcamentoItemForm
     template_name = 'orcamentos/orcamento_item_edit.html'
-    fields = [
-        'quantidade',
-        'valor_unitario',
-        'desconto_percentual',
-        'desconto_valor',
-        'descricao',
-    ]
 
     def get_success_url(self):
         return reverse_lazy(
@@ -325,7 +331,9 @@ class OrcamentoItemUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_queryset(self):
         # segurança: item só da empresa do usuário
-        return OrcamentoItem.objects.all()
+        return OrcamentoItem.objects.filter(
+            orcamento__empresa=self.request.user.perfil.empresa
+        )
 
 
 class OrcamentoPrintView(LoginRequiredMixin, DetailView):
@@ -351,13 +359,13 @@ class VendaListView(LoginRequiredMixin, ListView):
         ).select_related('cliente', 'orcamento')
 
 
+
 class VendaDetailView(LoginRequiredMixin, DetailView):
     model = Venda
     template_name = 'vendas/venda_detail.html'
     context_object_name = 'venda'
 
     def get_queryset(self):
-        """Filtra apenas vendas da empresa do usuário"""
         return Venda.objects.filter(
             empresa=self.request.user.perfil.empresa
         ).select_related('cliente', 'orcamento')
@@ -366,19 +374,7 @@ class VendaDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         venda = self.object
 
-        # Buscar parcelas
         parcelas = venda.parcelas.all().order_by('numero')
-
-        print(f'\n🔍 ===== GET CONTEXT DATA =====')
-        print(f'🔍 Venda ID: {venda.id}')
-        print(f'🔍 Tipo pagamento real: {venda.tipo_pagamento_real}')
-        print(f'🔍 Forma pagamento: {venda.forma_pagamento}')
-        print(f'🔍 Total parcelas: {parcelas.count()}')
-        if parcelas.exists():
-            for p in parcelas:
-                print(
-                    f'   - Parcela #{p.numero}: R$ {p.valor} - {p.data_vencimento} - {p.forma_pagamento}')
-        print(f'🔍 ==============================\n')
 
         context['parcelas'] = parcelas
         context['pagamento_existe'] = parcelas.exists()
@@ -388,82 +384,89 @@ class VendaDetailView(LoginRequiredMixin, DetailView):
             or Decimal('0.00')
         )
 
+        # ✅ PASSO 1: enviar parcelas salvas em JSON para o template
+        context['valor_pagamento'] = venda.valor_total
+        
+        context['parcelas_salvas_json'] = json.dumps([
+            {
+                "numero": p.numero,
+                "valor": str(p.valor),
+                "data": p.data_vencimento.strftime("%Y-%m-%d"),
+                "forma_pagamento": p.forma_pagamento or "",
+                "observacao": p.observacao or "",
+                "status": p.status,
+            }
+            for p in parcelas
+        ])
+
         return context
 
+
     def post(self, request, *args, **kwargs):
-        """Processa o salvamento do pagamento"""
         venda = self.get_object()
 
-        print(f'\n🔥 ===== POST RECEBIDO =====')
-        print(f'🔥 Venda ID: {venda.id}')
+        print(f'\n🔥 POST Venda #{venda.id}')
 
-        parcelas_json = request.POST.get('parcelas_json', '').strip()
-
-        # Salvar dados principais
+        # =========================
+        # DADOS DE PAGAMENTO REAL
+        # =========================
         venda.tipo_pagamento_real = request.POST.get('tipo_pagamento_real')
         venda.forma_pagamento = request.POST.get('forma_pagamento')
 
-        # 🔥 Salvar data_pagamento se existir
         data_pagamento = request.POST.get('data_pagamento')
         if data_pagamento:
             venda.data_pagamento = data_pagamento
 
-        # 🔥 Salvar valor_pagamento
-        valor_pagamento = request.POST.get('valor_pagamento')
-        if valor_pagamento:
-            venda.valor_pagamento = Decimal(valor_pagamento)
+        valor_pagamento = request.POST.get("valor_pagamento")
+        venda.valor_pagamento = quantize_money(parse_money(valor_pagamento, default=None)) or Decimal("0.00")
 
-        venda.observacoes_pagamento_real = request.POST.get(
-            'observacoes_pagamento')
+        venda.observacoes_pagamento_real = request.POST.get('observacoes_pagamento')
         venda.save()
 
-        print(f'🔥 Tipo pagamento: {venda.tipo_pagamento_real}')
-        print(f'🔥 Forma pagamento: {venda.forma_pagamento}')
-        print(f'🔥 Data pagamento: {venda.data_pagamento}')
-        print(f'🔥 Valor pagamento: {venda.valor_pagamento}')
+        # =========================
+        # PARCELAS (somente se vier JSON válido)
+        # =========================
+        parcelas_json = request.POST.get('parcelas_json', '').strip()
+        print(f'📦 parcelas_json: [{parcelas_json}]')
+        
+        alterou_parcelas = request.POST.get('alterou_parcelas') == '1'
 
-        # Processar parcelas
-        if parcelas_json:
-            print(
-                f'🔥 JSON recebido (primeiros 200 chars): {parcelas_json[:200]}')
-
-            # Deletar parcelas antigas
-            qtd_antigas = venda.parcelas.count()
-            venda.parcelas.all().delete()
-            print(f'🔥 Deletadas {qtd_antigas} parcelas antigas')
+        if parcelas_json and parcelas_json not in ('[]', 'null', '{}') and alterou_parcelas:
 
             try:
                 parcelas = json.loads(parcelas_json)
-                print(f'🔥 Criando {len(parcelas)} novas parcelas...')
 
-                for p in parcelas:
-                    parcela = Parcelamento.objects.create(
-                        venda=venda,
-                        numero=int(p['numero']),
-                        valor=Decimal(str(p['valor']).replace(',', '.')),
-                        data_vencimento=p['data'],
-                        forma_pagamento=p.get('forma_pagamento', ''),
-                        observacao=p.get('observacao', ''),
-                        status='pendente'
-                    )
-                    print(
-                        f'   ✅ Parcela #{parcela.numero}: R$ {parcela.valor} - {parcela.data_vencimento} - {parcela.forma_pagamento}')
+                if isinstance(parcelas, list) and parcelas:
+                    print('🔄 Atualizando parcelas…')
 
-                # Confirmar salvamento
-                total_agora = venda.parcelas.count()
-                print(f'🔥 Total de parcelas salvas: {total_agora}')
+                    venda.parcelas.all().delete()
 
-            except json.JSONDecodeError as e:
-                print(f'❌ ERRO ao parsear JSON: {e}')
+                    for p in parcelas:
+                        valor = quantize_money(parse_money(p.get("valor"), default=Decimal("0.00")))
+                        Parcelamento.objects.create(
+                            venda=venda,
+                            numero=int(p.get['numero']),
+                            valor=valor,
+                            #default=Decimal("0.00"),
+                            data_vencimento=p.get['data'],
+                            forma_pagamento=p.get('forma_pagamento', ''),
+                            observacao=p.get('observacao', ''),
+                            status=p.get('status', 'pendente'),
+                        )
+
+                    print(f'✅ Parcelas salvas: {venda.parcelas.count()}')
+                else:
+                    print('ℹ️ JSON vazio — parcelas mantidas.')
+
             except Exception as e:
-                print(f'❌ ERRO ao criar parcelas: {e}')
+                print(f'❌ Erro parcelas: {e}')
         else:
-            print(f'🔥 Nenhuma parcela enviada (JSON vazio)')
+            print('ℹ️ Nenhuma alteração em parcelas.')
 
-        print(f'🔥 ==========================\n')
+        print('🔥 POST finalizado\n')
 
-        # Redireciona de volta para a mesma página
-        return redirect('clientes:venda_list')
+        return redirect('clientes:venda_detail', pk=venda.pk)
+
 
 
 # FINANCEIRO

@@ -19,66 +19,46 @@
         <div class="row mb-3">
             <div class="col-md-6">
                 <label class="form-label">Serviço</label>
-                <input type="text"
-                       class="form-control"
-                       value="{{ object.servico.nome }}"
-                       disabled>
+                <input type="text" class="form-control" value="{{ object.servico.nome }}" disabled>
             </div>
 
             <div class="col-md-2">
                 <label class="form-label">Quantidade</label>
-                <input type="number"
-                       name="quantidade"
-                       class="form-control"
-                       value="{{ object.quantidade }}"
-                       min="1"
-                       required>
+                <input type="number" name="quantidade" class="form-control" value="{{ object.quantidade }}" min="1"
+                    required>
             </div>
 
             <div class="col-md-2">
                 <label class="form-label">Valor unitário</label>
-                <input type="number"
-                       step="0.01"
-                       name="valor_unitario"
-                       class="form-control"
-                       value="{{ object.valor_unitario }}"
-                       required>
+                <input type="number" step="0.01" name="valor_unitario" class="form-control"
+                    value="{{ object.valor_unitario }}" required>
             </div>
         </div>
 
         <div class="row mb-3">
             <div class="col-md-3">
                 <label class="form-label">% Desconto</label>
-                <input type="number"
-                       step="0.01"
-                       name="desconto_percentual"
-                       class="form-control"
-                       value="{{ object.desconto_percentual }}">
+                <input type="number" step="0.01" name="desconto_percentual" class="form-control"
+                    value="{{ object.desconto_percentual }}">
             </div>
 
             <div class="col-md-3">
                 <label class="form-label">R$ Desconto</label>
-                <input type="number"
-                       step="0.01"
-                       name="desconto_valor"
-                       class="form-control"
-                       value="{{ object.desconto_valor }}">
+                <input type="number" step="0.01" name="desconto_valor" class="form-control"
+                    value="{{ object.desconto_valor }}">
             </div>
 
             <div class="col-md-6">
                 <label class="form-label">Descrição</label>
-                <input type="text"
-                       name="descricao"
-                       class="form-control"
-                       value="{{ object.descricao }}">
+                <input type="text" name="descricao" class="form-control" value="{{ object.descricao|default_if_none:'' }}">
             </div>
+
         </div>
 
         <hr>
 
         <div class="d-flex justify-content-between">
-            <a href="{% url 'clientes:orcamento_detail' object.orcamento.id %}"
-               class="btn btn-secondary">
+            <a href="{% url 'clientes:orcamento_detail' object.orcamento.id %}" class="btn btn-secondary">
                 Cancelar
             </a>
 
