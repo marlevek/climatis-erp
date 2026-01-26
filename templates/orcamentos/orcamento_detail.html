@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "dashboard/base_dashboard.html" %}
 {% load static %}
 
 {% block content %}
@@ -15,6 +15,11 @@
            class="btn btn-outline-primary">
             🖨 Imprimir
         </a>
+        <a href="{% url 'clientes:orcamento_pdf' orcamento.id %}"
+   class="btn btn-sm btn-outline-danger">
+   📄 PDF
+</a>
+
     </div>
 </div>
 

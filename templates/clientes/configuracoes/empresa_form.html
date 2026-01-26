@@ -1,0 +1,198 @@
+{% extends "dashboard/base_dashboard.html" %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Dados da Empresa</h5>
+            <small class="text-muted">
+                Informações utilizadas em orçamentos, vendas e documentos
+            </small>
+        </div>
+
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Tipo de pessoa</label>
+                        <select name="tipo_pessoa" id="tipo-pessoa" class="form-select">
+                            <option value="PJ" {% if form.instance.tipo_pessoa == 'PJ' %}selected{% endif %}>
+                                Pessoa Jurídica
+                            </option>
+                            <option value="PF" {% if form.instance.tipo_pessoa == 'PF' %}selected{% endif %}>
+                                Pessoa Física
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+                        <label class="form-label">Nome</label>
+                        <input type="text" name="nome" class="form-control"
+                            value="{{ form.instance.nome|default_if_none:'' }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Nome fantasia</label>
+                        <input type="text" name="nome_fantasia" class="form-control"
+                            value="{{ form.instance.nome_fantasia|default_if_none:'' }}">
+                    </div>
+
+                    <div class="col-md-4" id="campo-cnpj">
+    <label class="form-label">CNPJ</label>
+    <input type="text" name="cnpj" class="form-control"
+           value="{{ form.instance.cnpj|default_if_none:'' }}">
+</div>
+
+
+                    <div class="col-md-4">
+                        <label class="form-label">E-mail</label>
+                        <input type="email" name="email" class="form-control"
+                            value="{{ form.instance.email|default_if_none:'' }}">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Telefone</label>
+                        <input type="text" name="telefone" class="form-control"
+                            value="{{ form.instance.telefone|default_if_none:'' }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Endereço</label>
+                        <input type="text" name="endereco" class="form-control"
+                            value="{{ form.instance.endereco|default_if_none:'' }}">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Cidade</label>
+                        <input type="text" name="cidade" class="form-control"
+                            value="{{ form.instance.cidade|default_if_none:'' }}">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Estado</label>
+                        <input type="text" name="estado" class="form-control"
+                            value="{{ form.instance.estado|default_if_none:'' }}">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">CEP</label>
+                        <input type="text" name="cep" class="form-control"
+                            value="{{ form.instance.cep|default_if_none:'' }}">
+                    </div>
+
+                    <div class="col-md-9">
+                        <label class="form-label">Logo da empresa</label>
+                        <input type="file" name="logo" class="form-control">
+                        {% if form.instance.logo %}
+                        <div class="mt-2">
+                            <small class="text-muted">Logo atual:</small><br>
+                            <img src="{{ form.instance.logo.url }}"
+                                style="max-height:80px; border:1px solid #ddd; padding:4px;" class="img-fluid border rounded p-1">
+                        </div>
+                        {% endif %}
+                    </div>
+
+                </div>
+
+                <hr class="my-4">
+
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-success px-4">
+                        Salvar alterações
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tipoPessoa = document.getElementById('tipo-pessoa');
+    const campoCnpj = document.getElementById('campo-cnpj');
+
+    function toggleCnpj() {
+        if (tipoPessoa.value === 'PF') {
+            campoCnpj.style.display = 'none';
+        } else {
+            campoCnpj.style.display = 'block';
+        }
+    }
+
+    tipoPessoa.addEventListener('change', toggleCnpj);
+    toggleCnpj(); // executa ao carregar
+});
+</script>
+
+<!-- Para busca automatica de dados pelo CNPJ-->
+ <script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    const tipoPessoa = document.getElementById('tipo-pessoa');
+    const cnpjInput = document.querySelector('input[name="cnpj"]');
+
+    if (!cnpjInput || !tipoPessoa) return;
+
+    cnpjInput.addEventListener('blur', function () {
+
+        // Só busca se for PJ
+        if (tipoPessoa.value !== 'PJ') return;
+
+        const cnpj = cnpjInput.value.replace(/\D/g, '');
+
+        if (cnpj.length !== 14) return;
+
+        fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('CNPJ não encontrado');
+                }
+                return response.json();
+            })
+            .then(data => {
+
+                if (data.razao_social) {
+                    document.querySelector('input[name="nome"]').value = data.razao_social;
+                }
+
+                if (data.nome_fantasia) {
+                    document.querySelector('input[name="nome_fantasia"]').value = data.nome_fantasia;
+                }
+
+                if (data.logradouro) {
+                    document.querySelector('input[name="endereco"]').value =
+                        `${data.logradouro}${data.numero ? ', ' + data.numero : ''}`;
+                }
+
+                if (data.municipio) {
+                    document.querySelector('input[name="cidade"]').value = data.municipio;
+                }
+
+                if (data.uf) {
+                    document.querySelector('input[name="estado"]').value = data.uf;
+                }
+
+                if (data.cep) {
+                    document.querySelector('input[name="cep"]').value = data.cep;
+                }
+
+            })
+            .catch(error => {
+                console.warn('Erro ao buscar CNPJ:', error.message);
+            });
+
+    });
+
+});
+</script>
+
+{% endblock %}

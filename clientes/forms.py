@@ -1,7 +1,8 @@
 from django import forms 
-from .models import Cliente 
+from .models import Cliente
 from clientes.models import OrcamentoItem
 from core.forms.fields import MoneyField
+from empresas.models import Empresa
 
 
 
@@ -58,3 +59,20 @@ class OrcamentoItemForm(forms.ModelForm):
 
 class PagamentoRealForm(forms.Form):
     valor_pagamento = MoneyField(required=False)
+
+
+class EmpresaForm(forms.ModelForm):
+    class Meta:
+        model = Empresa
+        fields = [
+            'nome',
+            'nome_fantasia',
+            'cnpj',
+            'email',
+            'telefone',
+            'endereco',
+            'cidade',
+            'estado',
+            'cep',
+            'logo',
+        ]

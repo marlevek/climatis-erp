@@ -1,7 +1,6 @@
 # core/utils/money.py
 from __future__ import annotations
-
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Optional, Union
 
 MoneyLike = Union[str, int, float, Decimal]
@@ -59,3 +58,9 @@ def quantize_money(value: Optional[Decimal]) -> Optional[Decimal]:
     if value is None:
         return None
     return value.quantize(Decimal("0.01"))
+
+
+def excel_money(valor):
+    if valor is None:
+        return Decimal('0.00')
+    return Decimal(valor).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)

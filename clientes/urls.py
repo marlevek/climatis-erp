@@ -16,9 +16,10 @@ from .views import (
     OrcamentoItemDeleteView,
     VendaListView,
     VendaDetailView,
+    empresa_update_view,
 )
 from clientes.views_relatorios import relatorio_inadimplencia
-from clientes.views import gerar_codigo_servico, dashboard_financeiro_view, aging_detalhe_view,  exportar_dashboard_excel, exportar_dashboard_pdf, cobrar_parcela_whatsapp
+from clientes.views import gerar_codigo_servico, dashboard_financeiro_view, aging_detalhe_view,  exportar_dashboard_excel, exportar_dashboard_pdf, cobrar_parcela_whatsapp, orcamento_pdf
 from clientes.views import parcelas_list
 from financeiro.views import novo_lancamento_financeiro, lista_lancamentos_financeiros, editar_lancamento_financeiro, excluir_lancamento_financeiro
 
@@ -47,6 +48,7 @@ urlpatterns = [
     path('orcamenots/item/<int:pk>/excluir/', OrcamentoItemDeleteView.as_view(), name='orcamento_item_delete'),
     path('orcamentos/item/<int:pk>/editar', OrcamentoItemUpdateView.as_view(), name='orcamento_item_edit'),
     path('orcamentos/<int:pk>/imprimir/', OrcamentoPrintView.as_view(), name='orcamento_print'),
+    path('orcamentos/<int:pk>/pdf', orcamento_pdf, name='orcamento_pdf'),
 
     # Vendas
     path('vendas/', VendaListView.as_view(), name='venda_list'),
@@ -79,5 +81,8 @@ urlpatterns = [
     
     # Parcelas
     path('parcelas/', parcelas_list, name='parcelas_list'),
+    
+    # Configurações Empresa
+    path('configuracoes/empresa/', empresa_update_view, name='empresa_update'),
 
 ]

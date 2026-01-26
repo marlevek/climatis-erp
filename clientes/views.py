@@ -6,8 +6,8 @@ import pandas as pd
 from django.utils.timezone import now
 from django.utils.http import urlencode
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView, TemplateView
-from .models import Cliente
-from .forms import ClienteForm, OrcamentoItemForm
+from .models import Cliente, Empresa
+from .forms import ClienteForm, OrcamentoItemForm, EmpresaForm
 from clientes.models import Servico, Orcamento, OrcamentoItem, Venda, Parcelamento
 from django.contrib.auth.mixins import LoginRequiredMixin
 from accounts.mixins import PerfilRequiredMixin
@@ -340,11 +340,73 @@ class OrcamentoPrintView(LoginRequiredMixin, DetailView):
     model = Orcamento
     template_name = 'orcamentos/orcamento_print.html'
 
-    def get_queryset(self):
-        # segurança: só permite imprimir orçamento da empresa do usuário
-        return Orcamento.objects.filter(
-            empresa=self.request.user.empresa
-        )
+# View para imprimir PDF do Orçamento
+@login_required
+def orcamento_pdf(request, pk):
+    orcamento = get_object_or_404(Orcamento, pk=pk)
+
+    empresa = orcamento.empresa
+    itens = orcamento.itens.all()
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'attachment; filename="orcamento_{orcamento.id}.pdf"'
+    )
+
+    doc = SimpleDocTemplate(response, pagesize=A4)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph(empresa.nome, styles["Title"]))
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph(f"Orçamento Nº {orcamento.id}", styles["Heading2"]))
+    elements.append(Paragraph(
+        f"Data: {orcamento.data.strftime('%d/%m/%Y')}",
+        styles["Normal"]
+    ))
+    elements.append(Paragraph(
+        f"Cliente: {orcamento.cliente}",
+        styles["Normal"]
+    ))
+    elements.append(Spacer(1, 12))
+
+    tabela = [["Serviço", "Qtde", "Valor Unit.", "Subtotal"]]
+
+    for item in itens:
+        subtotal = item.valor_unitario * item.quantidade
+        tabela.append([
+            item.servico.nome,
+            item.quantidade,
+            f"R$ {item.valor_unitario:,.2f}",
+            f"R$ {subtotal:,.2f}",
+        ])
+
+    tabela.append([
+        "", "", "Total",
+        f"R$ {orcamento.total_com_desconto():,.2f}"
+    ])
+
+    table = Table(tabela, colWidths=[230, 60, 90, 90])
+    table.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+    ]))
+
+    elements.append(table)
+
+    if orcamento.observacoes:
+        elements.append(Spacer(1, 15))
+        elements.append(Paragraph("Observações:", styles["Heading3"]))
+        elements.append(Paragraph(orcamento.observacoes, styles["Normal"]))
+
+    elements.append(Spacer(1, 30))
+    elements.append(Paragraph("__________________________________", styles["Normal"]))
+    elements.append(Paragraph("Assinatura do cliente", styles["Normal"]))
+
+    doc.build(elements)
+    return response
 
 
 ###### VENDAS ######
@@ -578,13 +640,19 @@ def exportar_dashboard_excel(request):
 
     mes = int(mes_raw) if mes_raw and mes_raw != "None" else None
     ano = int(ano_raw) if ano_raw and ano_raw != "None" else None
-
+    
+    dados = dashboard_financeiro_dados(mes, ano)
+    
+    from core.utils.money import excel_money
+    
     # ---------- Indicadores ----------
     indicadores = {
-        "Total Faturado": round(float(total_faturado(mes, ano)), 2),
-        "Total a Receber": round(float(total_a_receber(mes, ano)), 2),
-        "Total em Atraso": round(float(total_em_atraso(mes, ano)), 2),
-        "Qtd. Vendas em Atraso": qtd_vendas_em_atraso(mes, ano),
+        "Total Faturado": excel_money(dados["total_faturado"]),
+        "Total de Saídas": excel_money(dados["total_saidas"]),
+        "Saldo do Mês": excel_money(dados["saldo_mes"]),
+        "Total a Receber": excel_money(dados["total_a_receber"]),
+        "Total em Atraso": excel_money(dados["total_em_atraso"]),
+        "Qtd. Vendas em Atraso": dados["qtd_vendas_em_atraso"],
     }
 
     df_indicadores = pd.DataFrame(
@@ -593,12 +661,12 @@ def exportar_dashboard_excel(request):
     )
 
     # ---------- Aging ----------
-    aging = inadimplencia_por_aging(mes, ano)
+    aging = dados['aging']
     df_aging = pd.DataFrame([
         {
             "Faixa": faixa,
             "Quantidade": dados["quantidade"],
-            "Valor Total": dados["valor_total"]
+            "Valor Total":excel_money(dados["valor_total"])
         }
         for faixa, dados in aging.items()
     ])
@@ -680,12 +748,15 @@ def exportar_dashboard_pdf(request):
     elements.append(Spacer(1, 12))
 
     # -------- INDICADORES --------
+    dados = dashboard_financeiro_dados(mes, ano)
     indicadores = [
         ["Indicador", "Valor (R$)"],
-        ["Total Faturado", f"{total_faturado(mes, ano):,.2f}"],
-        ["Total a Receber", f"{total_a_receber(mes, ano):,.2f}"],
-        ["Total em Atraso", f"{total_em_atraso(mes, ano):,.2f}"],
-        ["Qtd. Vendas em Atraso", qtd_vendas_em_atraso(mes, ano)],
+        ["Total Faturado", f"{dados['total_faturado']:,.2f}"],
+        ["Total de Saídas", f"{dados['total_saidas']:,.2f}"],
+        ["Saldo do Mês", f"{dados['saldo_mes']:,.2f}"],
+        ["Total a Receber", f"{dados['total_a_receber']:,.2f}"],
+        ["Total em Atraso", f"{dados['total_em_atraso']:,.2f}"],
+        ["Qtd. Vendas em Atraso", dados["qtd_vendas_em_atraso"]],
     ]
 
     tabela_ind = Table(indicadores, colWidths=[250, 150])
@@ -705,7 +776,7 @@ def exportar_dashboard_pdf(request):
     elements.append(Spacer(1, 10))
 
     aging_data = [["Faixa", "Qtd Parcelas", "Valor Total (R$)"]]
-    aging = inadimplencia_por_aging(mes, ano)
+    aging = dados['aging']
 
     for faixa, dados in aging.items():
         aging_data.append([
@@ -770,4 +841,24 @@ def parcelas_list(request):
             'total_a_receber': total_a_receber,
             'total_em_atraso': total_em_atraso,
         }
+    )
+
+
+@login_required
+def empresa_update_view(request):
+    # por enquanto ERP monoempresa
+    empresa = Empresa.objects.first()
+
+    if request.method == "POST":
+        form = EmpresaForm(request.POST, request.FILES, instance=empresa)
+        if form.is_valid():
+            form.save()
+            return redirect("clientes:empresa_update")
+    else:
+        form = EmpresaForm(instance=empresa)
+
+    return render(
+        request,
+        "clientes/configuracoes/empresa_form.html",
+        {"form": form}
     )

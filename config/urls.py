@@ -16,8 +16,26 @@ urlpatterns = [
 
 ]
 
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+
+    path('clientes/', include('clientes.urls')),
+    path('enderecos/', include('enderecos.urls')),
+
+    
+    path('', RedirectView.as_view(url='/clientes/', permanent=False)),
+
+]
+
 if settings.DEBUG:
     urlpatterns += static(
         settings.STATIC_URL,
-        document_root=settings.BASE_DIR / 'static'
+        document_root=settings.STATIC_ROOT
     )
+    urlpatterns += static(
+        settings.MEDIA_URL,
+        document_root=settings.MEDIA_ROOT
+    )
+
+
