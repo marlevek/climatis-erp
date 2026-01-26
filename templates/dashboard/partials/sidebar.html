@@ -1,0 +1,106 @@
+<nav class="bg-dark text-white vh-100 p-3 d-flex flex-column" style="width:260px">
+
+    <!-- TOPO -->
+    <div>
+        <h5 class="mb-4">Climatis ERP</h5>
+
+        <ul class="nav flex-column gap-2">
+
+            <!-- 📂 COMERCIAL -->
+            <li class="text-uppercase text-muted small mt-3">Comercial</li>
+
+            <li class="nav-item">
+                <a href="{% url 'clientes:orcamento_list' %}" class="nav-link text-white py-1">
+                    Orçamentos
+                </a>
+            </li>
+
+            <li class="nav-item">
+                <a href="{% url 'clientes:venda_list' %}" class="nav-link text-white py-1">
+                    Vendas
+                </a>
+            </li>
+
+            <li class="nav-item">
+                <a href="{% url 'clientes:lista' %}" class="nav-link text-white">
+                    Clientes
+                </a>
+            </li>
+
+
+            <!-- 💰 FINANCEIRO -->
+            <li class="text-uppercase text-muted small mt-4">Financeiro</li>
+
+            <li class="nav-item">
+                <a href="{% url 'clientes:parcelas_list' %}" class="nav-link text-white py-1">
+                    Parcelas / Contas a Receber
+                </a>
+
+            </li>
+
+            <li class="nav-item">
+                <span class="nav-link text-secondary py-1">
+                    Fluxo de Caixa (em breve)
+                </span>
+            </li>
+
+            <li class="nav-item">
+                <span class="nav-link text-secondary py-1">
+                    Relatórios Financeiros (em breve)
+                </span>
+            </li>
+
+            <!-- 🧾 FISCAL -->
+            <li class="text-uppercase text-muted small mt-4">Fiscal</li>
+
+            <li class="nav-item">
+                <span class="nav-link text-secondary py-1">
+                    Notas Fiscais (NFSe)
+                </span>
+            </li>
+
+            <li class="nav-item">
+                <span class="nav-link text-secondary py-1">
+                    Configurações Fiscais
+                </span>
+            </li>
+
+            <!-- ⚙️ CONFIGURAÇÕES -->
+            <li class="text-uppercase text-muted small mt-4">Configurações</li>
+
+            <li class="nav-item">
+                <span class="nav-link text-secondary py-1">
+                    Dados da Empresa
+                </span>
+            </li>
+
+            <li class="nav-item">
+                <span class="nav-link text-secondary py-1">
+                    Usuários
+                </span>
+            </li>
+
+            <li class="nav-item">
+                <span class="nav-link text-secondary py-1">
+                    Formas de Pagamento
+                </span>
+            </li>
+
+            <li class="nav-item">
+                <span class="nav-link text-secondary py-1">
+                    Parâmetros do Sistema
+                </span>
+            </li>
+
+        </ul>
+    </div>
+
+    <!-- RODAPÉ (Sair SEMPRE embaixo) -->
+    <div class="mt-auto">
+        <hr class="text-secondary">
+        <a href="#" class="nav-link text-danger py-1">
+            Sair
+        </a>
+    </div>
+
+</nav>

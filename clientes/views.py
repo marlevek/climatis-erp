@@ -467,7 +467,7 @@ class VendaDetailView(LoginRequiredMixin, DetailView):
 
         return redirect('clientes:venda_detail', pk=venda.pk)
 
-
+from financeiro.services.dashboard_service import dashboard_financeiro_dados
 
 # FINANCEIRO
 @login_required
@@ -478,30 +478,11 @@ def dashboard_financeiro_view(request):
     mes = int(mes) if mes else None
     ano = int(ano) if ano else None
 
-    dados_financeiros = financeiro_mes(mes, ano)
-
-    context = {
-        "total_faturado": dados_financeiros['total_faturado'],
-        "total_saidas": dados_financeiros['saidas'],
-        "saldo_mes": dados_financeiros['saldo'],
-        "total_a_receber": total_a_receber(mes, ano),
-        "total_em_atraso": total_em_atraso(mes, ano),
-        "qtd_vendas_em_atraso": qtd_vendas_em_atraso(mes, ano),
-        "aging": inadimplencia_por_aging(mes, ano),
-
-        "comp_faturado": {
-            "atual": dados_financeiros["total_faturado"],
-            "anterior": financeiro_mes(
-                *calcular_mes_anterior(mes, ano)
-            )["total_faturado"] if calcular_mes_anterior(mes, ano)[0] else None,
-            "variacao": None
-        },
-
-        "comp_em_atraso": indicador_comparativo(total_em_atraso, mes, ano),
-
+    context = dashboard_financeiro_dados(mes, ano)
+    context.update({
         "mes_selecionado": mes,
         "ano_selecionado": ano,
-    }
+    })
 
     return render(
         request,
@@ -658,8 +639,6 @@ def exportar_dashboard_excel(request):
 
 
 # Exportar PDF
-
-
 @login_required
 def exportar_dashboard_pdf(request):
 
@@ -747,3 +726,48 @@ def exportar_dashboard_pdf(request):
 
     doc.build(elements)
     return response
+
+
+# Parcelas
+def parcelas_list(request):
+    hoje = now().date()
+    filtro = request.GET.get('status')
+
+    parcelas = Parcelamento.objects.select_related(
+        'venda',
+        'venda__cliente'
+    )
+
+    if filtro == 'pendente':
+        parcelas = parcelas.filter(status='pendente', data_vencimento__gte=hoje)
+
+    elif filtro == 'paga':
+        parcelas = parcelas.filter(status='paga')
+
+    elif filtro == 'atraso':
+        parcelas = parcelas.filter(status='pendente', data_vencimento__lt=hoje)
+
+    parcelas = parcelas.order_by('data_vencimento')
+
+    # Totais
+    total_a_receber = parcelas.filter(status='pendente').aggregate(
+        total=Sum('valor')
+    )['total'] or 0
+
+    total_em_atraso = parcelas.filter(
+        status='pendente',
+        data_vencimento__lt=hoje
+    ).aggregate(
+        total=Sum('valor')
+    )['total'] or 0
+
+    return render(
+        request,
+        'clientes/parcelas_list.html',
+        {
+            'parcelas': parcelas,
+            'filtro': filtro,
+            'total_a_receber': total_a_receber,
+            'total_em_atraso': total_em_atraso,
+        }
+    )

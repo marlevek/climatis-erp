@@ -19,6 +19,7 @@ from .views import (
 )
 from clientes.views_relatorios import relatorio_inadimplencia
 from clientes.views import gerar_codigo_servico, dashboard_financeiro_view, aging_detalhe_view,  exportar_dashboard_excel, exportar_dashboard_pdf, cobrar_parcela_whatsapp
+from clientes.views import parcelas_list
 from financeiro.views import novo_lancamento_financeiro, lista_lancamentos_financeiros, editar_lancamento_financeiro, excluir_lancamento_financeiro
 
 
@@ -71,11 +72,12 @@ urlpatterns = [
     'financeiro/lancamento/<int:lancamento_id>/editar/',
     editar_lancamento_financeiro,
     name='editar_lancamento_financeiro'
-),
-path(
-    'financeiro/lancamento/<int:lancamento_id>/excluir/',
-    excluir_lancamento_financeiro,
-    name='excluir_lancamento_financeiro'
-),
+    ),
+    path('financeiro/lancamento/<int:lancamento_id>/excluir/',
+        excluir_lancamento_financeiro,        name='excluir_lancamento_financeiro'
+    ),
+    
+    # Parcelas
+    path('parcelas/', parcelas_list, name='parcelas_list'),
 
 ]

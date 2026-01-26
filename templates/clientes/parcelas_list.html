@@ -1,0 +1,107 @@
+{% extends "dashboard/base_dashboard.html" %}
+
+{% block title %}Parcelas / Contas a Receber{% endblock %}
+
+{% block content %}
+
+<h3>Parcelas / Contas a Receber</h3>
+<div class="row mt-3">
+    <div class="col-md-3">
+        <div class="card border-success">
+            <div class="card-body">
+                <small class="text-muted">Total a receber</small>
+                <h5 class="text-success">
+                    R$ {{ total_a_receber|floatformat:2 }}
+                </h5>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card border-danger">
+            <div class="card-body">
+                <small class="text-muted">Total em atraso</small>
+                <h5 class="text-danger">
+                    R$ {{ total_em_atraso|floatformat:2 }}
+                </h5>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="btn-group mt-3">
+    <a href="{% url 'clientes:parcelas_list' %}"
+       class="btn btn-outline-secondary {% if not filtro %}active{% endif %}">
+        Todas
+    </a>
+
+    <a href="?status=pendente"
+       class="btn btn-outline-warning {% if filtro == 'pendente' %}active{% endif %}">
+        Pendentes
+    </a>
+
+    <a href="?status=atraso"
+       class="btn btn-outline-danger {% if filtro == 'atraso' %}active{% endif %}">
+        Em atraso
+    </a>
+
+    <a href="?status=paga"
+       class="btn btn-outline-success {% if filtro == 'paga' %}active{% endif %}">
+        Pagas
+    </a>
+</div>
+
+
+<table class="table table-sm table-hover mt-4">
+    <thead class="table-light">
+        <tr>
+            <th>#</th>
+            <th>Cliente</th>
+            <th>Venda</th>
+            <th>Vencimento</th>
+            <th>Status</th>
+            <th class="text-end">Valor</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in parcelas %}
+        <tr class="{% if p.esta_atrasada %}table-danger{% endif %}">
+            <td>{{ p.numero }}</td>
+
+            <td>
+                {{ p.venda.cliente }}
+            </td>
+
+            <td>
+                <a href="{% url 'clientes:venda_detail' p.venda.id %}">
+                    #{{ p.venda.id }}
+                </a>
+            </td>
+
+            <td>{{ p.data_vencimento|date:"d/m/Y" }}</td>
+
+            <td>
+                {% if p.status == 'paga' %}
+                    <span class="badge bg-success">Paga</span>
+                {% elif p.esta_atrasada %}
+                    <span class="badge bg-danger">Em atraso</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark">Pendente</span>
+                {% endif %}
+            </td>
+
+            <td class="text-end">
+                R$ {{ p.valor|floatformat:2 }}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-center text-muted">
+                Nenhuma parcela encontrada.
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
